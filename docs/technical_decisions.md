@@ -1,6 +1,6 @@
 # Technical Decisions/Design Rationale
 
-This document describes key design choices, default settings and assumptions in `bayessurvival`.
+This document describes key design choices, default settings and assumptions in `bird`.
 
 ---
 

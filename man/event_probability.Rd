@@ -4,12 +4,13 @@
 \alias{event_probability}
 \title{Event probability by clinical time horizons}
 \usage{
-event_probability(x, times = c(180, 365), method = c("logspline", "ecdf"))
+event_probability(x, times = NULL, method = c("logspline", "ecdf"))
 }
 \arguments{
 \item{x}{A \code{bayesian_imputation} object}
 
-\item{times}{Numeric vector of time horizons (in the same units as the data)}
+\item{times}{Optional numeric vector of time horizons (in the same units as
+the data). If \code{NULL}, defaults are chosen using \code{time_unit}.}
 
 \item{method}{Estimation method: "logspline" (default) or "ecdf" fallback}
 }

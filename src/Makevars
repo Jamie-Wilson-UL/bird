@@ -1,6 +1,12 @@
-# Use R's default Fortran compilation flags for portability
-OBJECTS = LDDPsurvival.o LDDPdensity.o ToolsDP.o ToolsSlice.o ToolsDistributions.o ToolsCDF.o ToolsCdflib.o ToolsPolynomials.o ToolsIntegrate.o ToolsMatrix.o ToolsStat.o ToolsRandlib.o ToolsSweep.o ToolsSparseMatrix.o ToolsRfun.o ToolsHPDreg.o ToolsBDP.o ToolsRnumbers.o ToolsDDP.o ToolsLDTFP.o
+# Generated from rstantools defaults and merged with existing DPpackage objects.
+STANHEADERS_SRC = $(shell "$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "message()" -e "cat(system.file('include', 'src', package = 'StanHeaders', mustWork = TRUE))" -e "message()" | grep "StanHeaders")
 
-PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
+STANC_FLAGS = $(shell "$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "cat(ifelse(utils::packageVersion('rstan') >= '2.26', '-DUSE_STANC3',''))")
+PKG_CPPFLAGS = -I"../inst/include" -I"$(STANHEADERS_SRC)" -DBOOST_DISABLE_ASSERTS -DEIGEN_NO_DEBUG -DBOOST_MATH_OVERFLOW_ERROR_POLICY=errno_on_error $(STANC_FLAGS) -D_HAS_AUTO_PTR_ETC=0
+PKG_CXXFLAGS = $(shell "$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "RcppParallel::CxxFlags()") $(shell "$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "StanHeaders:::CxxFlags()")
+PKG_LIBS = $(shell "$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "RcppParallel::RcppParallelLibs()") $(shell "$(R_HOME)/bin$(R_ARCH_BIN)/Rscript" -e "StanHeaders:::LdFlags()") $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
+CXX_STD = CXX17
+
+OBJECTS = LDDPsurvival.o LDDPdensity.o ToolsDP.o ToolsSlice.o ToolsDistributions.o ToolsCDF.o ToolsCdflib.o ToolsPolynomials.o ToolsIntegrate.o ToolsMatrix.o ToolsStat.o ToolsRandlib.o ToolsSweep.o ToolsSparseMatrix.o ToolsRfun.o ToolsHPDreg.o ToolsBDP.o ToolsRnumbers.o ToolsDDP.o ToolsLDTFP.o init.o stanExports_exponential_imputation.o stanExports_lognormal_imputation.o stanExports_weibull_imputation.o
 
 all: $(SHLIB)

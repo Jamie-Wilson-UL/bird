@@ -2,7 +2,7 @@
 % Please edit documentation in R/methods.R
 \name{calculate_cox_ph_test}
 \alias{calculate_cox_ph_test}
-\title{Calculate Cox proportional hazards test for group comparison}
+\title{Calculate pooled Cox hazard-ratio summary for group comparison}
 \usage{
 calculate_cox_ph_test(object)
 }
@@ -10,6 +10,6 @@ calculate_cox_ph_test(object)
 \item{object}{bayesian_imputation_groups object}
 }
 \description{
-Calculate Cox proportional hazards test for group comparison
+Calculate pooled Cox hazard-ratio summary for group comparison
 }
 \keyword{internal}

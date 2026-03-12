@@ -85,7 +85,7 @@ C
 C                              Arguments
 C
 C
-C     X --> value at which scaled log gamma is to be returned
+C     X --> value at which scaled log cdflib_gamma is to be returned
 C                    X is DOUBLE PRECISION
 C
 C
@@ -3297,7 +3297,7 @@ C
 C                              Function
 C
 C
-C     Calculates any one parameter of the gamma
+C     Calculates any one parameter of the cdflib_gamma
 C     distribution given values for the others.
 C
 C
@@ -3313,7 +3313,7 @@ C               iwhich = 3 : Calculate SHAPE from P,Q,X and SCALE
 C               iwhich = 4 : Calculate SCALE from P,Q,X and SHAPE
 C                    INTEGER WHICH
 C
-C     P <--> The integral from 0 to X of the gamma density.
+C     P <--> The integral from 0 to X of the cdflib_gamma density.
 C            Input range: [0,1].
 C                    DOUBLE PRECISION P
 C
@@ -3323,18 +3323,18 @@ C            P + Q = 1.0.
 C                    DOUBLE PRECISION Q
 C
 C
-C     X <--> The upper limit of integration of the gamma density.
+C     X <--> The upper limit of integration of the cdflib_gamma density.
 C            Input range: [0, +infinity).
 C            Search range: [0,1E300]
 C                    DOUBLE PRECISION X
 C
-C     SHAPE <--> The shape parameter of the gamma density.
+C     SHAPE <--> The shape parameter of the cdflib_gamma density.
 C                Input range: (0, +infinity).
 C                Search range: [1E-300,1E300]
 C                  DOUBLE PRECISION SHAPE
 C
 C
-C     SCALE <--> The scale parameter of the gamma density.
+C     SCALE <--> The scale parameter of the cdflib_gamma density.
 C                Input range: (0, +infinity).
 C                Search range: (1E-300,1E300]
 C                   DOUBLE PRECISION SCALE
@@ -3346,7 +3346,7 @@ C                  search bound
 C                2 if answer appears to be higher than greatest
 C                  search bound
 C                3 if P + Q .ne. 1
-C                10 if the gamma or inverse gamma routine cannot
+C                10 if the cdflib_gamma or inverse cdflib_gamma routine cannot
 C                   compute the answer.  Usually happens only for
 C                   X and SHAPE very large (gt 1E10 or more)
 C                    INTEGER STATUS
@@ -3368,7 +3368,7 @@ C     Cumulative distribution function (P) is calculated directly by
 C     the code associated with:
 C
 C     DiDinato, A. R. and Morris, A. H. Computation of the  incomplete
-C     gamma function  ratios  and their  inverse.   ACM  Trans.  Math.
+C     cdflib_gamma function  ratios  and their  inverse.   ACM  Trans.  Math.
 C     Softw. 12 (1986), 377-393.
 C
 C     Computation of other parameters involve a seach for a value that
@@ -3380,7 +3380,7 @@ C                              Note
 C
 C
 C
-C     The gamma density is proportional to
+C     The cdflib_gamma density is proportional to
 C       T**(SHAPE - 1) * EXP(- SCALE * T)
 C
 C
@@ -4242,7 +4242,7 @@ C
 C     Formula   26.4.21  of   Abramowitz  and   Stegun,   Handbook  of
 C     Mathematical Functions (1966) is used  to reduce the computation
 C     of  the cumulative distribution function to that  of computing a
-C     chi-square, hence an incomplete gamma function.
+C     chi-square, hence an incomplete cdflib_gamma function.
 C
 C     Cumulative  distribution function  (P) is  calculated  directly.
 C     Computation of other parameters involve a seach for a value that
@@ -4847,7 +4847,7 @@ C
 C                              Method
 C
 C
-C     Calls incomplete gamma function (CUMGAM)
+C     Calls incomplete cdflib_gamma function (CUMGAM)
 C
 C**********************************************************************
 C     .. Scalar Arguments ..
@@ -5402,10 +5402,10 @@ C
 C                              Function
 C
 C
-C     Computes   the  cumulative        of    the     incomplete   gamma
+C     Computes   the  cumulative        of    the     incomplete   cdflib_gamma
 C     distribution, i.e., the integral from 0 to X of
 C          (1/GAM(A))*EXP(-T)*T**(A-1) DT
-C     where GAM(A) is the complete gamma function of A, i.e.,
+C     where GAM(A) is the complete cdflib_gamma function of A, i.e.,
 C          GAM(A) = integral from 0 to infinity of
 C                    EXP(-T)*T**(A-1) DT
 C
@@ -5413,16 +5413,16 @@ C
 C                              Arguments
 C
 C
-C     X --> The upper limit of integration of the incomplete gamma.
+C     X --> The upper limit of integration of the incomplete cdflib_gamma.
 C                                                X is DOUBLE PRECISION
 C
-C     A --> The shape parameter of the incomplete gamma.
+C     A --> The shape parameter of the incomplete cdflib_gamma.
 C                                                A is DOUBLE PRECISION
 C
-C     CUM <-- Cumulative incomplete gamma distribution.
+C     CUM <-- Cumulative incomplete cdflib_gamma distribution.
 C                                        CUM is DOUBLE PRECISION
 C
-C     CCUM <-- Compliment of Cumulative incomplete gamma distribution.
+C     CCUM <-- Compliment of Cumulative incomplete cdflib_gamma distribution.
 C                                                CCUM is DOUBLE PRECISIO
 C
 C
@@ -5723,7 +5723,7 @@ C------------------------------------------------------------------
       IF (result.LT.min) result = 0.0D0
       IF (ccum.LT.min) ccum = 0.0D0
 C------------------------------------------------------------------
-C  Fix up for negative argument, erf, etc.
+C  Fix up for negative argument, cdflib_erf, etc.
 C------------------------------------------------------------------
 C----------Last card of ANORM ----------
       END
@@ -5856,9 +5856,9 @@ C                              Function
 C
 C
 C     Log(Beta(A,B)) = Lgamma(A) + Lgamma(B) - Lgamma(A+B)
-C     where Lgamma is the log of the (complete) gamma function
+C     where Lgamma is the log of the (complete) cdflib_gamma function
 C
-C     Let ZZ be approximation obtained if each log gamma is approximated
+C     Let ZZ be approximation obtained if each log cdflib_gamma is approximated
 C     by Sterling's formula, i.e.,
 C     Sterling(Z) = LOG( SQRT( 2*PI ) ) + ( Z-0.5 ) * LOG( Z ) - Z
 C
@@ -6791,7 +6791,7 @@ C
 C                              Arguments
 C
 C
-C     X --> value at which scaled log gamma is to be returned
+C     X --> value at which scaled log cdflib_gamma is to be returned
 C                    X is DOUBLE PRECISION
 C
 C
@@ -7320,7 +7320,7 @@ C     TO GET-FUNCTION-VALUE
       if(i99999.eq.3)go to 200
 
       END
-      DOUBLE PRECISION FUNCTION erf(x)
+      DOUBLE PRECISION FUNCTION cdflib_erf(x)
 C-----------------------------------------------------------------------
 C             EVALUATION OF THE REAL ERROR FUNCTION
 C-----------------------------------------------------------------------
@@ -7368,7 +7368,7 @@ C-------------------------
       t = x*x
       top = ((((a(1)*t+a(2))*t+a(3))*t+a(4))*t+a(5)) + 1.0D0
       bot = ((b(1)*t+b(2))*t+b(3))*t + 1.0D0
-      erf = x* (top/bot)
+      cdflib_erf = x* (top/bot)
       RETURN
 C
    10 IF (ax.GT.4.0D0) GO TO 20
@@ -7376,8 +7376,8 @@ C
      +      p(7))*ax + p(8)
       bot = ((((((q(1)*ax+q(2))*ax+q(3))*ax+q(4))*ax+q(5))*ax+q(6))*ax+
      +      q(7))*ax + q(8)
-      erf = 0.5D0 + (0.5D0-exp(-x*x)*top/bot)
-      IF (x.LT.0.0D0) erf = -erf
+      cdflib_erf = 0.5D0 + (0.5D0-exp(-x*x)*top/bot)
+      IF (x.LT.0.0D0) cdflib_erf = -cdflib_erf
       RETURN
 C
    20 IF (ax.GE.5.8D0) GO TO 30
@@ -7385,12 +7385,12 @@ C
       t = 1.0D0/x2
       top = (((r(1)*t+r(2))*t+r(3))*t+r(4))*t + r(5)
       bot = (((s(1)*t+s(2))*t+s(3))*t+s(4))*t + 1.0D0
-      erf = (c-top/ (x2*bot))/ax
-      erf = 0.5D0 + (0.5D0-exp(-x2)*erf)
-      IF (x.LT.0.0D0) erf = -erf
+      cdflib_erf = (c-top/ (x2*bot))/ax
+      cdflib_erf = 0.5D0 + (0.5D0-exp(-x2)*cdflib_erf)
+      IF (x.LT.0.0D0) cdflib_erf = -cdflib_erf
       RETURN
 C
-   30 erf = sign(1.0D0,x)
+   30 cdflib_erf = sign(1.0D0,x)
       RETURN
 
       END
@@ -7679,7 +7679,9 @@ C     -------------------
       t = a
       d = a - 0.5D0
       IF (d.GT.0.0D0) t = d - 0.5D0
-      IF (t) 40,10,20
+      IF (t.LT.0.0D0) GO TO 40
+      IF (t.EQ.0.0D0) GO TO 10
+      GO TO 20
 C
    10 gam1 = 0.0D0
       RETURN
@@ -7772,8 +7774,8 @@ C     .. Local Arrays ..
       DOUBLE PRECISION amin(2),bmin(2),dmin(2),emin(2),eps0(2)
 C     ..
 C     .. External Functions ..
-      DOUBLE PRECISION alnrel,gamln,gamln1,gamma,rcomp,spmpar
-      EXTERNAL alnrel,gamln,gamln1,gamma,rcomp,spmpar
+      DOUBLE PRECISION alnrel,gamln,gamln1,cdflib_gamma,rcomp,spmpar
+      EXTERNAL alnrel,gamln,gamln1,cdflib_gamma,rcomp,spmpar
 C     ..
 C     .. External Subroutines ..
       EXTERNAL gratio
@@ -7837,7 +7839,7 @@ C        SELECTION OF THE INITIAL APPROXIMATION XN OF X
 C                       WHEN A .LT. 1
 C
       IF (a.GT.1.0D0) GO TO 80
-      g = gamma(a+1.0D0)
+      g = cdflib_gamma(a+1.0D0)
       qg = q*g
       IF (qg.EQ.0.0D0) GO TO 360
       b = qg/a
@@ -8162,7 +8164,7 @@ C
       RETURN
 
       END
-      DOUBLE PRECISION FUNCTION gamma(a)
+      DOUBLE PRECISION FUNCTION cdflib_gamma(a)
 C-----------------------------------------------------------------------
 C
 C         EVALUATION OF THE GAMMA FUNCTION FOR REAL ARGUMENTS
@@ -8218,7 +8220,7 @@ C     .. Executable Statements ..
 C--------------------------
 
       s=0.d0
-      gamma = 0.0D0
+      cdflib_gamma = 0.0D0
       x = a
       IF (abs(a).GE.15.0D0) GO TO 110
 C-----------------------------------------------------------------------
@@ -8229,7 +8231,9 @@ C-----------------------------------------------------------------------
 C
 C     LET T BE THE PRODUCT OF A-J WHEN A .GE. 2
 C
-      IF (m) 40,30,10
+      IF (m.LT.0) GO TO 40
+      IF (m.EQ.0) GO TO 30
+      GO TO 10
    10 DO 20 j = 1,m
           x = x - 1.0D0
           t = x*t
@@ -8258,7 +8262,7 @@ C     CODE MAY BE OMITTED IF DESIRED.
 C
       IF (abs(t).GE.1.D-30) GO TO 80
       IF (abs(t)*spmpar(3).LE.1.0001D0) RETURN
-      gamma = 1.0D0/t
+      cdflib_gamma = 1.0D0/t
       RETURN
 C
 C     COMPUTE GAMMA(1 + X) FOR  0 .LE. X .LT. 1
@@ -8269,15 +8273,15 @@ C
           top = p(i) + x*top
           bot = q(i) + x*bot
    90 CONTINUE
-      gamma = top/bot
+      cdflib_gamma = top/bot
 C
 C     TERMINATION
 C
       IF (a.LT.1.0D0) GO TO 100
-      gamma = gamma*t
+      cdflib_gamma = cdflib_gamma*t
       RETURN
 
-  100 gamma = gamma/t
+  100 cdflib_gamma = cdflib_gamma/t
       RETURN
 C-----------------------------------------------------------------------
 C            EVALUATION OF GAMMA(A) FOR ABS(A) .GE. 15
@@ -8309,8 +8313,8 @@ C
       w = g
       t = g - dble(w)
       IF (w.GT.0.99999D0*exparg(0)) RETURN
-      gamma = exp(w)* (1.0D0+t)
-      IF (a.LT.0.0D0) gamma = (1.0D0/ (gamma*s))/x
+      cdflib_gamma = exp(w)* (1.0D0+t)
+      IF (a.LT.0.0D0) cdflib_gamma = (1.0D0/ (cdflib_gamma*s))/x
       RETURN
 
       END
@@ -8323,8 +8327,8 @@ C     .. Local Scalars ..
      +                 t,tol,w,z
 C     ..
 C     .. External Functions ..
-      DOUBLE PRECISION erf,erfc1,gam1,rexp
-      EXTERNAL erf,erfc1,gam1,rexp
+      DOUBLE PRECISION cdflib_erf,erfc1,gam1,rexp
+      EXTERNAL cdflib_erf,erfc1,gam1,rexp
 C     ..
 C     .. Intrinsic Functions ..
       INTRINSIC abs,dlog,exp,sqrt
@@ -8407,7 +8411,7 @@ C
       RETURN
 C
   100 IF (x.GE.0.25D0) GO TO 110
-      p = erf(sqrt(x))
+      p = cdflib_erf(sqrt(x))
       q = 0.5D0 + (0.5D0-p)
       RETURN
 
@@ -8463,8 +8467,9 @@ C     .. Local Arrays ..
      +                 d5(4),d6(2),e00(3),wk(20),x00(3)
 C     ..
 C     .. External Functions ..
-      DOUBLE PRECISION erf,erfc1,gam1,gamma,rexp,rlog,spmpar
-      EXTERNAL erf,erfc1,gam1,gamma,rexp,rlog,spmpar
+      DOUBLE PRECISION cdflib_erf,erfc1,gam1,cdflib_gamma,rexp,
+     +                 rlog,spmpar
+      EXTERNAL cdflib_erf,erfc1,gam1,cdflib_gamma,rexp,rlog,spmpar
 C     ..
 C     .. Intrinsic Functions ..
       INTRINSIC abs,dble,dlog,dmax1,exp,int,sqrt
@@ -8567,7 +8572,7 @@ C
       GO TO 220
 
    20 t1 = a*dlog(x) - x
-      r = exp(t1)/gamma(a)
+      r = exp(t1)/cdflib_gamma(a)
       GO TO 40
 C
    30 l = x/a
@@ -8738,7 +8743,9 @@ C
       u = 1.0D0/a
       z = sqrt(z+z)
       IF (l.LT.1.0D0) z = -z
-      IF (iop-2) 280,290,300
+      IF (iop.LT.2) GO TO 280
+      IF (iop.EQ.2) GO TO 290
+      GO TO 300
 C
   280 IF (abs(s).LE.1.D-3) GO TO 340
       c0 = ((((((((((((d0(13)*z+d0(12))*z+d0(11))*z+d0(10))*z+d0(9))*z+
@@ -8784,7 +8791,9 @@ C
       u = 1.0D0/a
       z = sqrt(z+z)
       IF (l.LT.1.0D0) z = -z
-      IF (iop-2) 340,350,360
+      IF (iop.LT.2) GO TO 340
+      IF (iop.EQ.2) GO TO 350
+      GO TO 360
 C
   340 c0 = ((((((d0(7)*z+d0(6))*z+d0(5))*z+d0(4))*z+d0(3))*z+d0(2))*z+
      +     d0(1))*z - third
@@ -8817,7 +8826,7 @@ C
       RETURN
 C
   390 IF (x.GE.0.25D0) GO TO 400
-      ans = erf(sqrt(x))
+      ans = cdflib_erf(sqrt(x))
       qans = 0.5D0 + (0.5D0-ans)
       RETURN
 
@@ -9502,8 +9511,8 @@ C     .. Local Scalars ..
       DOUBLE PRECISION rt2pin,t,t1,u
 C     ..
 C     .. External Functions ..
-      DOUBLE PRECISION gam1,gamma,rlog
-      EXTERNAL gam1,gamma,rlog
+      DOUBLE PRECISION gam1,cdflib_gamma,rlog
+      EXTERNAL gam1,cdflib_gamma,rlog
 C     ..
 C     .. Intrinsic Functions ..
       INTRINSIC dlog,exp,sqrt
@@ -9520,7 +9529,7 @@ C     -------------------
       rcomp = (a*exp(t))* (1.0D0+gam1(a))
       RETURN
 
-   10 rcomp = exp(t)/gamma(a)
+   10 rcomp = exp(t)/cdflib_gamma(a)
       RETURN
 C
    20 u = x/a

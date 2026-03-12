@@ -15,4 +15,3 @@ List of default prior parameters
 \description{
 Get default priors for a given distribution
 }
-\keyword{internal}

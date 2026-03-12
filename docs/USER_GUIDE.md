@@ -1,4 +1,4 @@
-# bayessurvival User Guide
+# bird User Guide
 
 ---
 
@@ -8,16 +8,18 @@ Install from GitHub and load the library:
 
 ```r
 install.packages("devtools")
-devtools::install_github("Jamie-Wilson-UL/bayessurvival")
+devtools::install_github("Jamie-Wilson-UL/bird")
 
-library(bayessurvival)
+library(bird)
 ```
 
-If you plan to use the parametric engines (Weibull, exponential, lognormal), the models are compiled with `rstan` on first use. That requires a working C++ toolchain:
+If you plan to use the parametric engines (Weibull, exponential, lognormal), `rstan` is used with precompiled package models.
 
-- **Windows**: Install RTools (includes C++ compiler)
-- **macOS**: Install Xcode Command Line Tools: `xcode-select --install`
-- **Linux**: Install `g++` and `make` (e.g. `sudo apt-get install build-essential`)
+- **CRAN binary installs (Windows/macOS)** usually do not need local Stan compilation.
+- **Source installs** still need a working C++ toolchain at install time:
+  - **Windows**: Install RTools (includes C++ compiler)
+  - **macOS**: Install Xcode Command Line Tools: `xcode-select --install`
+  - **Linux**: Install `g++` and `make` (e.g. `sudo apt-get install build-essential`)
 
 Recommended runtime settings:
 
@@ -50,6 +52,11 @@ fit <- impute(
 )
 ```
 
+Time units:
+- `time_unit` defaults to `"days"` if omitted.
+- `time_unit` controls labels/reporting and default time-horizon summaries.
+- The input `time` values are assumed to already be in that unit (no automatic conversion is performed).
+
 By default, `impute()` tries to detect the time and status columns (looking for common names like `time`, `status`, `duration`, etc.). If your column names are unusual it is advisable to specify them explicitly:
 
 ```r
@@ -81,13 +88,17 @@ The print method gives a basic statistical summary with sensible next steps:
 print(fit)
 ```
 
-You can sanity-check your imputations with the plotting helpers:
+You can check your imputations with the plotting helpers:
 
 ```r
 plot(fit, type = "survival")                  # observed vs imputed survival curves
-plot(fit, type = "completed_dataset_summary") # overview of a single (random) completed dataset
-plot(fit, type = "boxplots_comparison")       # compare all imputed datasets side-by-side
-plot(fit, type = "density")                   # logspline density comparison
+plot(fit, type = "survival", n_curves = 20)  # show more imputed survival curves
+plot(fit, type = "completed_dataset_summary") # overview of one random completed dataset
+plot(fit, type = "completed_dataset_summary", dataset_id = 3)  # pick a specific dataset
+plot(fit, type = "boxplots_comparison")       # compares up to 10 random datasets by default
+plot(fit, type = "boxplots_comparison", n_max = 20)            # increase the displayed limit
+plot(fit, type = "boxplots_comparison", dataset_indices = c(1, 5, 10)) # choose exact datasets
+plot(fit, type = "density")                   # mean imputed density + pointwise 95% band
 ```
 
 When you want to dive deeper into model diagnostics, these are available too:
@@ -105,9 +116,84 @@ All of the group-specific objects (`impute(..., groups = ...)`) respond to the s
 ```r
 print(fit_grp)
 plot(fit_grp, type = "survival")
-plot(fit_grp, type = "group_comparison")
+plot(fit_grp, type = "completed_dataset_summary") 
+plot(fit_grp, type = "survival", combine_groups = FALSE)  # separate panel per group
 plot(fit_grp, type = "boxplots_comparison")
 ```
+
+For `plot(fit_grp, type = "completed_dataset_summary")`:
+- 2 groups: full 4-panel view (histogram, density, survival, boxplot),
+- >2 groups: simplified view (survival + boxplot).
+
+### 3-Group Example
+
+```r
+lung3 <- survival::lung
+lung3$age_group <- cut(
+  lung3$age,
+  breaks = c(-Inf, 60, 70, Inf),
+  labels = c("<60", "60-70", ">70"),
+  right = TRUE
+)
+
+fit_grp3 <- impute(
+  lung3,
+  groups = "age_group",
+  distribution = "weibull",
+  n_imputations = 5,
+  time_unit = "days"
+)
+
+print(fit_grp3)
+plot(fit_grp3, type = "survival")
+plot(fit_grp3, type = "survival", combine_groups = FALSE)
+plot(fit_grp3, type = "completed_dataset_summary")  # simplified (survival + boxplot) for >2 groups
+```
+
+---
+
+## Comparing Multiple Models
+
+If you want to compare parametric and nonparametric imputations directly, use `compare_models()`:
+
+```r
+cmp <- compare_models(
+  lung,
+  models = c("weibull", "nonparametric"),
+  n_imputations = 5
+)
+```
+
+You can then use a comparison-oriented print/plot workflow:
+
+```r
+print(cmp)
+plot(cmp, type = "survival")
+plot(cmp, type = "completed_dataset_summary")
+```
+
+`models` can include any combination of:
+- `"weibull"`
+- `"exponential"`
+- `"lognormal"`
+- `"nonparametric"` (also accepts aliases `"np"`, `"lddp"`)
+
+Completed datasets are available in combined or model-specific form:
+
+```r
+# Stack all selected models into one dataset (adds .model)
+combined <- complete(cmp, dataset = 1, models = "combined")
+
+# Return one object per model
+separate <- complete(cmp, dataset = 1, models = "separate")
+
+# Extract only one model from the comparison
+weibull_only <- complete(cmp, dataset = 1, models = "weibull")
+```
+
+For `plot(cmp, type = "completed_dataset_summary")`:
+- 2 models: full 4-panel view (histogram, density, survival, boxplot),
+- >2 models: simplified view (survival + boxplot) to avoid overcrowded plots.
 
 ---
 

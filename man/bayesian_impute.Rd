@@ -2,7 +2,7 @@
 % Please edit documentation in R/bayesian-impute.R
 \name{bayesian_impute}
 \alias{bayesian_impute}
-\title{Bayesian Imputation for Censored Survival Data}
+\title{Bayesian Imputation for Right-Censored Survival Data}
 \usage{
 bayesian_impute(
   data,

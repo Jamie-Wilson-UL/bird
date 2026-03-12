@@ -13,3 +13,10 @@
 .Rlib/
 .tmp/
 BPD2.R
+/doc/
+/Meta/
+Rplots.pdf
+/qa_plots/
+/qa_model_behavior/
+/qa_model_behavior_full/
+/scripts/

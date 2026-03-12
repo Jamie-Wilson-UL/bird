@@ -11,13 +11,14 @@
   n_curves = 10,
   alpha = 0.3,
   show_original = TRUE,
+  n_max = NULL,
   ...
 )
 }
 \arguments{
 \item{x}{A bayesian_imputation_groups object}
 
-\item{type}{Type of plot ("survival", "group_comparison", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density")}
+\item{type}{Type of plot ("survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density")}
 
 \item{combine_groups}{For survival plots: whether to show all groups on same plot (TRUE) or separate plots (FALSE)}
 
@@ -26,6 +27,10 @@
 \item{alpha}{For survival plots: transparency for imputed curves}
 
 \item{show_original}{For survival plots: whether to show original Kaplan-Meier curves}
+
+\item{n_max}{Backward-compatible alias:
+for \code{type = "survival"}, treated as \code{n_curves};
+for \code{type = "boxplots_comparison"}, maximum datasets shown.}
 
 \item{...}{Additional arguments passed to plotting functions}
 }

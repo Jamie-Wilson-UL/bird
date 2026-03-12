@@ -1,6 +1,6 @@
 # Core Bayesian Imputation Function
 
-#' Bayesian Imputation for Censored Survival Data
+#' Bayesian Imputation for Right-Censored Survival Data
 #'
 #' This function implements the Bayesian imputation methodology from Moghaddam et al. (2022)
 #' for handling right-censored survival data. It treats censored observations as missing
@@ -381,6 +381,11 @@ generate_complete_datasets <- function(data, time_col, status_col,
       imputed_data$original_status <- data[[status_col]]
       imputed_data$was_censored <- data[[status_col]] == 0
       imputed_data$dataset_id <- i
+      imputed_data <- standardize_complete_column_order(
+        imputed_data,
+        time_col = time_col,
+        status_col = status_col
+      )
       datasets[[i]] <- imputed_data
     }
     return(datasets)
@@ -420,6 +425,11 @@ generate_complete_datasets <- function(data, time_col, status_col,
     
     # Add dataset identifier
     imputed_data$dataset_id <- i
+    imputed_data <- standardize_complete_column_order(
+      imputed_data,
+      time_col = time_col,
+      status_col = status_col
+    )
     datasets[[i]] <- imputed_data
   }
   

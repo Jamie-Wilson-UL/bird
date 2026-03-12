@@ -86,9 +86,9 @@ LDDPsurvival.R:
 
 Modifications:
 --------------
-The bayessurvival package uses these vendored components without modification
+The bird package uses these vendored components without modification
 to the core algorithmic code. Wrapper functions have been added to provide
-a modern R interface consistent with the bayessurvival API, but the LDDP
+a modern R interface consistent with the bird API, but the LDDP
 survival model implementation remains as originally authored by the DPpackage
 team.
 

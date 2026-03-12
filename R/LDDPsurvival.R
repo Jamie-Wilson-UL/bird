@@ -348,7 +348,7 @@ function(formula,
                           worksam   = as.double(worksam),
                           workcpo   = as.double(workcpo),
                           workcpo2  = as.double(workcpo2),
-                          PACKAGE="bayessurvival")
+                          PACKAGE="bird")
          
        #########################################################################################
        # save state
@@ -715,7 +715,7 @@ fancydensplot1<-function(x, hpd=TRUE, npts=200, xlab="", ylab="", main="",col="#
         	aupp<-rep(0,2)
         	n<-length(x)
 		a<-.Fortran("hpd",n=as.integer(n),alpha=as.double(alpha),x=as.double(x),
-		                     alow=as.double(alow),aupp=as.double(aupp),PACKAGE="bayessurvival")
+		                     alow=as.double(alow),aupp=as.double(aupp),PACKAGE="bird")
 		xlinf<-a$alow[1]            
 		xlsup<-a$aupp[1]            
 	}

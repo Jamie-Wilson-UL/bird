@@ -4,6 +4,63 @@
 #' @name plotting-helpers
 NULL
 
+# Shared visual helpers to keep plot styling consistent across all plot types.
+theme_bird <- function(base_size = 12) {
+  ggplot2::theme_minimal(base_size = base_size) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(face = "bold", size = base_size + 2),
+      plot.subtitle = ggplot2::element_text(size = base_size, color = "gray35"),
+      plot.caption = ggplot2::element_text(size = base_size - 2, color = "gray45"),
+      axis.title = ggplot2::element_text(size = base_size + 1),
+      axis.text = ggplot2::element_text(size = base_size),
+      legend.title = ggplot2::element_text(size = base_size),
+      legend.text = ggplot2::element_text(size = base_size - 1),
+      panel.grid.minor = ggplot2::element_blank()
+    )
+}
+
+style_bird_plot <- function(p, legend_position = "right", legend_justification = NULL, base_size = 12) {
+  p <- p + theme_bird(base_size = base_size) + ggplot2::theme(legend.position = legend_position)
+  if (!is.null(legend_justification)) {
+    p <- p + ggplot2::theme(legend.justification = legend_justification)
+  }
+  p
+}
+
+panel_title_bird <- function(text, base_size = 13) {
+  grid::textGrob(
+    label = text,
+    x = 0,
+    hjust = 0,
+    gp = grid::gpar(fontsize = base_size, fontface = "bold", col = "gray20")
+  )
+}
+
+resolve_group_colors <- function(group_names, group_colors = NULL) {
+  n <- length(group_names)
+  default_cols <- grDevices::hcl.colors(n, "Dark 3")
+  names(default_cols) <- group_names
+
+  if (is.null(group_colors)) {
+    return(default_cols)
+  }
+
+  if (!is.null(names(group_colors)) && any(names(group_colors) %in% group_names)) {
+    out <- default_cols
+    nm <- intersect(names(group_colors), group_names)
+    out[nm] <- group_colors[nm]
+    return(out)
+  }
+
+  group_colors <- as.character(group_colors)
+  if (length(group_colors) < n) {
+    group_colors <- rep(group_colors, length.out = n)
+  }
+  out <- group_colors[seq_len(n)]
+  names(out) <- group_names
+  out
+}
+
 #' Plot survival curves 
 #' @param x bayesian_imputation object
 #' @param n_curves Number of imputed curves to show (default: 10)
@@ -75,14 +132,14 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
       x = paste0("Time (", x$model_info$time_unit %||% "days", ")"), 
       y = "Survival probability", color = NULL
     ) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(
-      legend.position = c(0.98, 0.98), legend.justification = c(1, 1),
-      legend.text = ggplot2::element_text(size = 13),
-      axis.text = ggplot2::element_text(size = 13),
-      axis.title = ggplot2::element_text(size = 16)
-    ) +
     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
+
+  p <- style_bird_plot(
+    p,
+    legend_position = c(0.98, 0.98),
+    legend_justification = c(1, 1),
+    base_size = 13
+  )
   
   # Add median survival lines from imputed datasets (mean median across imputations)
   all_medians <- sapply(x$imputed_datasets, function(ds) {
@@ -100,12 +157,12 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
       ggplot2::geom_segment(
         data = hseg,
         ggplot2::aes(x = x_start, y = y, xend = x_end, yend = y_end),
-        inherit.aes = FALSE, linetype = "dotted", size = 0.8, alpha = 0.7, color = "red"
+        inherit.aes = FALSE, linetype = "dotted", linewidth = 0.8, alpha = 0.7, color = "red"
       ) +
       ggplot2::geom_segment(
         data = vseg,
         ggplot2::aes(x = x_start, y = y, xend = x_end, yend = y_end),
-        inherit.aes = FALSE, linetype = "dotted", size = 0.8, alpha = 0.7, color = "red"
+        inherit.aes = FALSE, linetype = "dotted", linewidth = 0.8, alpha = 0.7, color = "red"
       )
   }
   
@@ -167,12 +224,9 @@ plot_boxplots_comparison <- function(x, n_max = 10, dataset_indices = NULL, ...)
       subtitle = paste("Comparing", length(dataset_indices), "sampled datasets (of", total, ")"),
       x = "Survival Time",
       y = "Imputed Dataset"
-    ) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(size = 14, face = "bold"),
-      plot.subtitle = ggplot2::element_text(size = 12)
     )
+
+  p <- style_bird_plot(p, legend_position = "none", base_size = 12)
   
   return(p)
 }
@@ -214,7 +268,7 @@ plot_boxplots_comparison_groups <- function(x, n_max = 10, ...) {
   }
   ncol <- min(2, length(grobs))
   arranged <- gridExtra::grid.arrange(grobs = grobs, ncol = ncol,
-                                      top = "Distribution of Survival Times Across Imputed Datasets -- Groups")
+                                      top = panel_title_bird("Distribution of Survival Times Across Imputed Datasets -- Groups"))
   return(arranged)
 }
 
@@ -361,7 +415,7 @@ plot_posterior_censored <- function(result, obs_id = NULL, dataset_id = NULL, sh
     ggplot2::geom_histogram(ggplot2::aes(y = ggplot2::after_stat(density)),
                             bins = 30, alpha = 0.7,
                             fill = "lightblue", color = "darkblue") +
-    ggplot2::geom_density(color = "red", size = 1.2, adjust = 1.5)
+    ggplot2::geom_density(color = "red", linewidth = 1.2, adjust = 1.5)
 
   # Add vertical reference lines with legend (censoring vs imputed)
   lines_df <- data.frame(
@@ -374,7 +428,7 @@ plot_posterior_censored <- function(result, obs_id = NULL, dataset_id = NULL, sh
     ggplot2::geom_vline(
       data = lines_df,
       ggplot2::aes(xintercept = xintercept, linetype = line_type, color = line_type),
-      size = 1.2,
+      linewidth = 1.2,
       key_glyph = "path"
     ) +
     ggplot2::scale_color_manual(
@@ -429,13 +483,13 @@ plot_posterior_censored <- function(result, obs_id = NULL, dataset_id = NULL, sh
     )
   }
 
-  p <- p + ggplot2::theme_minimal() +
+  p <- style_bird_plot(
+    p,
+    legend_position = c(0.98, 0.98),
+    legend_justification = c(1, 1),
+    base_size = 11
+  ) +
     ggplot2::theme(
-      plot.title = ggplot2::element_text(size = 14, face = "bold"),
-      plot.subtitle = ggplot2::element_text(size = 11, color = "gray60"),
-      plot.caption = ggplot2::element_text(size = 9, color = "gray60"),
-      legend.position = c(0.98, 0.98),
-      legend.justification = c(1, 1),
       legend.background = ggplot2::element_rect(fill = grDevices::adjustcolor("white", alpha.f = 0.75), color = "grey85"),
       legend.title = ggplot2::element_text(size = 9),
       legend.text = ggplot2::element_text(size = 8)
@@ -474,6 +528,7 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, ...) {
   p1 <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
     ggplot2::geom_histogram(bins = 30, fill = "lightblue", alpha = 0.7) +
     ggplot2::labs(title = "Histogram", x = "Time", y = "Count")
+  p1 <- style_bird_plot(p1, legend_position = "none", base_size = 11)
   
   # Panel 2: Density (fitted with logspline)
   if (requireNamespace("logspline", quietly = TRUE)) {
@@ -511,13 +566,15 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, ...) {
     y_density <- logspline::dlogspline(x_grid, ls_fit)
 
     p2 <- ggplot2::ggplot(data.frame(x = x_grid, y = y_density), ggplot2::aes(x = x, y = y)) +
-      ggplot2::geom_line(color = "darkblue", size = 1) +
+      ggplot2::geom_line(color = "darkblue", linewidth = 1) +
       ggplot2::labs(title = "Density", x = "Time", y = "Density")
+    p2 <- style_bird_plot(p2, legend_position = "none", base_size = 11)
   } else {
     # Fallback to regular density
     p2 <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
       ggplot2::geom_density(fill = "lightgreen", alpha = 0.7) +
       ggplot2::labs(title = "Density", x = "Time", y = "Density")
+    p2 <- style_bird_plot(p2, legend_position = "none", base_size = 11)
   }
   
   # Panel 3: Survival Curve
@@ -528,17 +585,19 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, ...) {
   
   p3 <- ggplot2::ggplot(data.frame(time = km_fit$time, survival = km_fit$surv), 
                         ggplot2::aes(x = time, y = survival)) +
-    ggplot2::geom_step(color = "red", size = 1) +
+    ggplot2::geom_step(color = "red", linewidth = 1) +
     ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability")
+  p3 <- style_bird_plot(p3, legend_position = "none", base_size = 11)
   
   # Panel 4: Boxplot
   p4 <- ggplot2::ggplot(dataset, ggplot2::aes(x = "", y = .data[[time_var]])) +
     ggplot2::geom_boxplot(fill = "lightcoral", alpha = 0.7) +
     ggplot2::labs(title = "Boxplot", x = "", y = "Survival Time")
+  p4 <- style_bird_plot(p4, legend_position = "none", base_size = 11)
   
   # Combine plots
   combined_plot <- gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2,
-                                          top = paste("Completed Dataset", dataset_id, "Summary"))
+                                          top = panel_title_bird(paste("Completed Dataset", dataset_id, "Summary")))
   
   return(combined_plot)
 }
@@ -547,11 +606,11 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, ...) {
 #' @param x bayesian_imputation_groups object
 #' @param dataset_id Dataset ID to plot (NULL for random)
 #' @param alpha Transparency for overlapping plots
-#' @param group_colors Color palette for groups
+#' @param group_colors Optional color palette for groups (auto-generated if NULL)
 #' @param ... Additional arguments
 #' @keywords internal
 plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, alpha = 0.6, 
-                                                 group_colors = c("blue", "orange"), ...) {
+                                                 group_colors = NULL, ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
@@ -570,6 +629,8 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, alpha = 
       stop("Invalid dataset_id for group: ", group_name)
     }
   }
+
+  group_color_map <- resolve_group_colors(x$group_names, group_colors)
   
   # Get datasets for each group
   group_datasets <- list()
@@ -589,8 +650,9 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, alpha = 
   # Panel 1: Histogram
   p1 <- ggplot2::ggplot(all_data, ggplot2::aes(x = .data[[time_var]], fill = group)) +
     ggplot2::geom_histogram(bins = 30, alpha = alpha, position = "identity") +
-    ggplot2::scale_fill_manual(values = setNames(group_colors[1:length(x$group_names)], x$group_names)) +
+    ggplot2::scale_fill_manual(values = group_color_map) +
     ggplot2::labs(title = "Histogram", x = "Time", y = "Count", fill = "Group")
+  p1 <- style_bird_plot(p1, base_size = 11)
   
   # Panel 2: Density (fitted with logspline)
   if (requireNamespace("logspline", quietly = TRUE)) {
@@ -639,15 +701,17 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, alpha = 
     }
 
     p2 <- ggplot2::ggplot(density_data, ggplot2::aes(x = x, y = y, color = group)) +
-      ggplot2::geom_line(size = 1, alpha = alpha) +
-      ggplot2::scale_color_manual(values = setNames(group_colors[1:length(x$group_names)], x$group_names)) +
+      ggplot2::geom_line(linewidth = 1, alpha = alpha) +
+      ggplot2::scale_color_manual(values = group_color_map) +
       ggplot2::labs(title = "Density", x = "Time", y = "Density", color = "Group")
+    p2 <- style_bird_plot(p2, base_size = 11)
   } else {
     # Fallback to regular density
     p2 <- ggplot2::ggplot(all_data, ggplot2::aes(x = .data[[time_var]], fill = group)) +
       ggplot2::geom_density(alpha = alpha) +
-      ggplot2::scale_fill_manual(values = setNames(group_colors[1:length(x$group_names)], x$group_names)) +
+      ggplot2::scale_fill_manual(values = group_color_map) +
       ggplot2::labs(title = "Density", x = "Time", y = "Density", fill = "Group")
+    p2 <- style_bird_plot(p2, base_size = 11)
   }
   
   # Panel 3: Survival Curve
@@ -672,21 +736,316 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, alpha = 
   }
   
   p3 <- ggplot2::ggplot(survival_data, ggplot2::aes(x = time, y = survival, color = group)) +
-    ggplot2::geom_step(size = 1, alpha = alpha) +
-    ggplot2::scale_color_manual(values = setNames(group_colors[1:length(x$group_names)], x$group_names)) +
+    ggplot2::geom_step(linewidth = 1, alpha = alpha) +
+    ggplot2::scale_color_manual(values = group_color_map) +
     ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability", color = "Group")
+  p3 <- style_bird_plot(p3, base_size = 11)
   
   # Panel 4: Boxplots
   p4 <- ggplot2::ggplot(all_data, ggplot2::aes(x = group, y = .data[[time_var]], fill = group)) +
     ggplot2::geom_boxplot(alpha = alpha) +
-    ggplot2::scale_fill_manual(values = setNames(group_colors[1:length(x$group_names)], x$group_names)) +
+    ggplot2::scale_fill_manual(values = group_color_map) +
     ggplot2::labs(title = "Boxplots", x = "Group", y = "Survival Time", fill = "Group")
+  p4 <- style_bird_plot(p4, base_size = 11)
   
-  # Combine plots
-  combined_plot <- gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2,
-                                          top = paste("Completed Dataset", dataset_id, "Summary - Group Comparison"))
+  # For >2 groups, simplify to avoid overcrowded histogram/density overlays
+  if (length(x$group_names) > 2) {
+    combined_plot <- gridExtra::grid.arrange(
+      p3, p4, ncol = 2,
+      top = panel_title_bird(paste("Completed Dataset", dataset_id, "Summary - Group Comparison"))
+    )
+    return(combined_plot)
+  }
+
+  # Keep full 4-panel comparison for 2 groups
+  combined_plot <- gridExtra::grid.arrange(
+    p1, p2, p3, p4, ncol = 2,
+    top = panel_title_bird(paste("Completed Dataset", dataset_id, "Summary - Group Comparison"))
+  )
   
   return(combined_plot)
+}
+
+#' Plot survival curves across compared models
+#' @param x bird_model_comparison object
+#' @param show_original Whether to overlay Kaplan-Meier from original observed data
+#' @param n_grid Number of grid points used to summarise model curves
+#' @param alpha Ribbon transparency for model uncertainty bands
+#' @param model_colors Optional named/un-named vector of colors for models
+#' @param ... Additional arguments (unused)
+#' @keywords internal
+plot_survival_curves_models <- function(x, show_original = TRUE, n_grid = 200, alpha = 0.18, model_colors = NULL, ...) {
+  if (!requireNamespace("survival", quietly = TRUE)) {
+    stop("survival package required for Kaplan-Meier curves")
+  }
+
+  model_names <- x$model_names
+  color_map <- resolve_model_colors(model_names, model_colors)
+
+  all_times <- c()
+  for (nm in model_names) {
+    fit <- x$model_results[[nm]]
+    for (j in seq_along(fit$imputed_datasets)) {
+      all_times <- c(all_times, fit$imputed_datasets[[j]][[fit$time_col]])
+    }
+  }
+  all_times <- all_times[is.finite(all_times) & all_times >= 0]
+  if (length(all_times) < 2) {
+    stop("Not enough finite times found to build survival comparison")
+  }
+
+  t_min <- min(all_times)
+  t_max <- max(all_times)
+  if (!is.finite(t_min) || !is.finite(t_max)) {
+    stop("Could not determine plotting range for model comparison")
+  }
+  if (identical(t_min, t_max)) {
+    t_max <- t_max + 1
+  }
+  time_grid <- seq(t_min, t_max, length.out = max(50, as.integer(n_grid)))
+
+  qfun <- function(v, prob) {
+    v <- v[is.finite(v)]
+    if (length(v) == 0) return(NA_real_)
+    as.numeric(stats::quantile(v, prob, na.rm = TRUE))
+  }
+
+  summary_data <- data.frame()
+  median_stats <- list()
+  time_var <- x$time_col
+  status_var <- x$status_col
+
+  for (nm in model_names) {
+    fit <- x$model_results[[nm]]
+    n_sets <- length(fit$imputed_datasets)
+    surv_mat <- matrix(NA_real_, nrow = length(time_grid), ncol = n_sets)
+    medians <- rep(NA_real_, n_sets)
+
+    for (j in seq_len(n_sets)) {
+      ds <- fit$imputed_datasets[[j]]
+      km <- survival::survfit(
+        as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
+        data = ds
+      )
+
+      surv_mat[, j] <- survival_step_at_grid(km, time_grid)
+      idx <- which(km$surv <= 0.5)[1]
+      medians[j] <- if (!is.na(idx)) km$time[idx] else max(km$time, na.rm = TRUE)
+    }
+
+    model_df <- data.frame(
+      time = time_grid,
+      surv_mean = rowMeans(surv_mat, na.rm = TRUE),
+      surv_q025 = apply(surv_mat, 1, qfun, prob = 0.025),
+      surv_q975 = apply(surv_mat, 1, qfun, prob = 0.975),
+      model = nm,
+      stringsAsFactors = FALSE
+    )
+    summary_data <- rbind(summary_data, model_df)
+
+    median_stats[[nm]] <- list(
+      mean = mean(medians, na.rm = TRUE),
+      q025 = qfun(medians, 0.025),
+      q975 = qfun(medians, 0.975)
+    )
+  }
+
+  p <- ggplot2::ggplot(summary_data, ggplot2::aes(x = time, y = surv_mean, color = model, fill = model)) +
+    ggplot2::geom_ribbon(ggplot2::aes(ymin = surv_q025, ymax = surv_q975), alpha = alpha, color = NA) +
+    ggplot2::geom_step(linewidth = 1) +
+    ggplot2::scale_color_manual(values = color_map) +
+    ggplot2::scale_fill_manual(values = color_map) +
+    ggplot2::labs(
+      title = "Survival Curve Comparison Across Models",
+      subtitle = "Line: mean survival across completed datasets | Ribbon: 95% interval",
+      x = paste0("Time (", x$model_info$time_unit, ")"),
+      y = "Survival probability",
+      color = "Model",
+      fill = "Model"
+    )
+
+  if (show_original) {
+    km_orig <- survival::survfit(
+      as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
+      data = x$original_data
+    )
+    orig_df <- data.frame(time = km_orig$time, survival = km_orig$surv)
+    p <- p + ggplot2::geom_step(
+      data = orig_df,
+      ggplot2::aes(x = time, y = survival),
+      inherit.aes = FALSE,
+      color = "black",
+      linewidth = 0.9,
+      linetype = "22"
+    )
+  }
+
+  med_caption <- paste(
+    sapply(model_names, function(nm) {
+      st <- median_stats[[nm]]
+      paste0(
+        nm, ": median ", round(st$mean, 1), " ",
+        x$model_info$time_unit, " [", round(st$q025, 1), ", ", round(st$q975, 1), "]"
+      )
+    }),
+    collapse = " | "
+  )
+
+  p <- style_bird_plot(p, base_size = 12)
+
+  p + ggplot2::labs(caption = med_caption) +
+    ggplot2::theme(plot.caption = ggplot2::element_text(size = 9, color = "gray40", hjust = 0))
+}
+
+#' Plot completed dataset summary for model comparison
+#' @param x bird_model_comparison object
+#' @param dataset_id Dataset index to compare (same index used for all models)
+#' @param alpha Transparency for overlays
+#' @param model_colors Optional named/un-named vector of colors for models
+#' @param ... Additional arguments (unused)
+#' @keywords internal
+plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, alpha = 0.55, model_colors = NULL, ...) {
+  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    stop("gridExtra package required for arranging plots")
+  }
+  if (!requireNamespace("survival", quietly = TRUE)) {
+    stop("survival package required for survival curves")
+  }
+
+  model_names <- x$model_names
+  n_models <- length(model_names)
+  color_map <- resolve_model_colors(model_names, model_colors)
+  time_var <- x$time_col
+  status_var <- x$status_col
+
+  n_per_model <- vapply(x$model_results, function(res) {
+    length(res$imputed_datasets)
+  }, integer(1))
+  n_common <- min(n_per_model)
+  if (n_common < 1) {
+    stop("No completed datasets available for model comparison")
+  }
+
+  if (is.null(dataset_id)) {
+    dataset_id <- sample(seq_len(n_common), 1)
+  }
+  if (!is.numeric(dataset_id) || dataset_id < 1 || dataset_id > n_common) {
+    stop("dataset_id must be between 1 and ", n_common)
+  }
+  dataset_id <- as.integer(dataset_id)
+
+  model_datasets <- list()
+  for (nm in model_names) {
+    d <- x$model_results[[nm]]$imputed_datasets[[dataset_id]]
+    d$.model <- nm
+    model_datasets[[nm]] <- d
+  }
+  all_data <- do.call(rbind, lapply(model_datasets, function(d) {
+    data.frame(
+      .time = d[[time_var]],
+      .status = d[[status_var]],
+      .model = d$.model,
+      stringsAsFactors = FALSE
+    )
+  }))
+
+  # Survival panel data from selected completed dataset per model
+  surv_data <- data.frame()
+  for (nm in model_names) {
+    d <- model_datasets[[nm]]
+    km <- survival::survfit(
+      as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
+      data = d
+    )
+    surv_data <- rbind(surv_data, data.frame(
+      time = km$time,
+      survival = km$surv,
+      model = nm,
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  p_surv <- ggplot2::ggplot(surv_data, ggplot2::aes(x = time, y = survival, color = model)) +
+    ggplot2::geom_step(linewidth = 1) +
+    ggplot2::scale_color_manual(values = color_map) +
+    ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability", color = "Model")
+  p_surv <- style_bird_plot(p_surv, base_size = 11)
+
+  p_box <- ggplot2::ggplot(all_data, ggplot2::aes(x = .model, y = .time, fill = .model)) +
+      ggplot2::geom_boxplot(alpha = alpha) +
+    ggplot2::scale_fill_manual(values = color_map) +
+      ggplot2::labs(title = "Boxplots", x = "Model", y = "Survival Time", fill = "Model")
+  p_box <- style_bird_plot(p_box, base_size = 11)
+
+  # For two models, keep full 4-panel diagnostic view; for >2 simplify to avoid clutter.
+  if (n_models <= 2) {
+    p_hist <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, fill = .model)) +
+      ggplot2::geom_histogram(bins = 30, alpha = alpha, position = "identity") +
+      ggplot2::scale_fill_manual(values = color_map) +
+      ggplot2::labs(title = "Histogram", x = "Time", y = "Count", fill = "Model")
+    p_hist <- style_bird_plot(p_hist, base_size = 11)
+
+    p_dens <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, color = .model, fill = .model)) +
+      ggplot2::geom_density(alpha = alpha * 0.5) +
+      ggplot2::scale_color_manual(values = color_map) +
+      ggplot2::scale_fill_manual(values = color_map) +
+      ggplot2::labs(title = "Density", x = "Time", y = "Density", color = "Model", fill = "Model")
+    p_dens <- style_bird_plot(p_dens, base_size = 11)
+
+    return(gridExtra::grid.arrange(
+      p_hist, p_dens, p_surv, p_box, ncol = 2,
+      top = panel_title_bird(paste("Completed Dataset", dataset_id, "Summary - Model Comparison"))
+    ))
+  }
+
+  gridExtra::grid.arrange(
+    p_surv, p_box, ncol = 2,
+    top = panel_title_bird(paste(
+      "Completed Dataset", dataset_id,
+      "Summary - Model Comparison (simplified for", n_models, "models)"
+    ))
+  )
+}
+
+#' Resolve colors for model comparisons
+#' @param model_names Character vector of model names.
+#' @param model_colors Optional color vector.
+#' @keywords internal
+resolve_model_colors <- function(model_names, model_colors = NULL) {
+  n <- length(model_names)
+  default_cols <- grDevices::hcl.colors(n, "Dark 3")
+  names(default_cols) <- model_names
+
+  if (is.null(model_colors)) {
+    return(default_cols)
+  }
+
+  if (!is.null(names(model_colors)) && any(names(model_colors) %in% model_names)) {
+    out <- default_cols
+    nm <- intersect(names(model_colors), model_names)
+    out[nm] <- model_colors[nm]
+    return(out)
+  }
+
+  model_colors <- as.character(model_colors)
+  if (length(model_colors) < n) {
+    model_colors <- rep(model_colors, length.out = n)
+  }
+  out <- model_colors[seq_len(n)]
+  names(out) <- model_names
+  out
+}
+
+#' Evaluate a Kaplan-Meier survival step function on a grid
+#' @param km `survfit` object.
+#' @param grid Numeric grid.
+#' @keywords internal
+survival_step_at_grid <- function(km, grid) {
+  idx <- findInterval(grid, km$time)
+  out <- rep(1, length(grid))
+  positive <- idx > 0
+  out[positive] <- km$surv[idx[positive]]
+  out
 }
 
 #' Plot density comparison using logspline
@@ -755,6 +1114,10 @@ plot_density_comparison <- function(x, n_curves = NULL, alpha = 0.3, ...) {
   
   # Create plot 
   time_unit <- x$model_info$time_unit %||% "days"
+  ribbon_caption <- paste0(
+    "Shaded band: pointwise 95% interval (2.5% to 97.5%) across ",
+    n_show, " imputed density curves"
+  )
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = type)) +
     ggplot2::geom_line(linewidth = 0.9) +
     ggplot2::geom_ribbon(
@@ -767,16 +1130,22 @@ plot_density_comparison <- function(x, n_curves = NULL, alpha = 0.3, ...) {
       title = NULL,
       subtitle = NULL,
       x = paste0("Time (", time_unit, ")"),
-      y = "Density"
-    ) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(
-      legend.position = c(0.98, 0.98), legend.justification = c(1, 1),
-      legend.text = ggplot2::element_text(size = 13),
-      axis.text = ggplot2::element_text(size = 13),
-      axis.title = ggplot2::element_text(size = 16)
+      y = "Density",
+      caption = ribbon_caption
     ) +
     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
+  p <- style_bird_plot(
+    p,
+    legend_position = c(0.98, 0.98),
+    legend_justification = c(1, 1),
+    base_size = 13
+  ) +
+    ggplot2::theme(
+      legend.text = ggplot2::element_text(size = 13),
+      axis.text = ggplot2::element_text(size = 13),
+      axis.title = ggplot2::element_text(size = 16),
+      plot.caption = ggplot2::element_text(size = 10, color = "gray50", hjust = 0)
+    )
   
   return(p)
 } 
@@ -810,8 +1179,11 @@ plot_survival_curves_by_group_safe <- function(x, n_curves = 10, alpha = 0.3, sh
   }
   
   # Define color palette for groups
-  group_colors <- c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
-                    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+  group_colors <- resolve_group_colors(
+    x$group_names,
+    c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+      "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+  )
   
   if (combine_groups) {
     # Combined plot - all groups on same plot
@@ -831,6 +1203,7 @@ plot_survival_curves_by_group_safe <- function(x, n_curves = 10, alpha = 0.3, sh
 #' @param ... Additional arguments
 #' @keywords internal
 plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, group_colors, ...) {
+  group_color_map <- resolve_group_colors(x$group_names, group_colors)
   
   # Collect all plot data
   all_plot_data <- data.frame()
@@ -956,7 +1329,7 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
       x_end = sapply(median_stats, function(x) x$mean_median),
       y_end = 0.5
     ), ggplot2::aes(x = x_start, y = y_start, xend = x_end, yend = y_end, color = legend_label), 
-    linetype = "dotted", size = 0.8, alpha = 0.7) +
+    linetype = "dotted", linewidth = 0.8, alpha = 0.7) +
     ggplot2::geom_segment(data = data.frame(
       legend_label = paste0("Bayesian imputation (group = ", names(median_stats), ")"),
       median_time = sapply(median_stats, function(x) x$mean_median),
@@ -965,11 +1338,11 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
       x_end = sapply(median_stats, function(x) x$mean_median),
       y_end = 0
     ), ggplot2::aes(x = x_start, y = y_start, xend = x_end, yend = y_end, color = legend_label), 
-    linetype = "dotted", size = 0.8, alpha = 0.7) +
+    linetype = "dotted", linewidth = 0.8, alpha = 0.7) +
     # Color scheme: group colors for imputed, black for KM
     ggplot2::scale_color_manual(
       values = c(
-        setNames(group_colors[1:length(x$group_names)], paste0("Bayesian imputation (group = ", x$group_names, ")")),
+        setNames(unname(group_color_map[x$group_names]), paste0("Bayesian imputation (group = ", x$group_names, ")")),
         "KM estimation" = "black"
       ),
       name = NULL
@@ -990,15 +1363,19 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
                        }
                      }), collapse = " | "))
     ) +
-    ggplot2::theme_minimal() +
+    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
+  p <- style_bird_plot(
+    p,
+    legend_position = c(0.98, 0.98),
+    legend_justification = c(1, 1),
+    base_size = 13
+  ) +
     ggplot2::theme(
-      legend.position = c(0.98, 0.98), legend.justification = c(1, 1),
       legend.text = ggplot2::element_text(size = 13),
       axis.text = ggplot2::element_text(size = 13),
       axis.title = ggplot2::element_text(size = 16),
       plot.caption = ggplot2::element_text(size = 10, color = "gray60", hjust = 0)
-    ) +
-    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
+    )
   
   return(p)
 }
@@ -1035,21 +1412,6 @@ plot_survival_curves_separate <- function(x, n_curves, alpha, show_original, gro
   return(plot_list)
 } 
 
-#' Plot group comparison panels
-#' @param x bayesian_imputation_groups object
-#' @param ... Additional arguments
-#' @keywords internal
-plot_group_comparison_panels_safe <- function(x, ...) {
-  # Side-by-side plots for each group
-  cat("Plotting group comparison panels...\n")
-  
-  # For now, just plot each group separately
-  for (group_name in x$group_names) {
-    cat("Plotting group:", group_name, "\n")
-    plot(x$group_results[[group_name]], ...)
-  }
-}
-
 #' Plot individual groups
 #' @param x bayesian_imputation_groups object
 #' @param type Plot type
@@ -1057,10 +1419,17 @@ plot_group_comparison_panels_safe <- function(x, ...) {
 #' @keywords internal
 plot_individual_groups_safe <- function(x, type, ...) {
   # Plot each group separately for other plot types
+  rendered_plots <- list()
   for (group_name in x$group_names) {
     cat("Plotting group:", group_name, "with type:", type, "\n")
-    plot(x$group_results[[group_name]], type = type, ...)
+    p <- plot(x$group_results[[group_name]], type = type, ...)
+    if (!is.null(p)) {
+      print(p)
+      rendered_plots[[group_name]] <- p
+    }
   }
+  
+  invisible(rendered_plots)
 } 
 
 #' Plot posterior distributions for censored observations by group (side-by-side)
@@ -1115,7 +1484,7 @@ plot_posterior_censored_groups <- function(x, dataset_id = NULL, ...) {
   n_groups <- length(plot_list)
   ncol <- min(2, n_groups)
   common_title <- paste0("Posterior distributions by group (random censored obs)")
-  arranged <- gridExtra::grid.arrange(grobs = plot_list, ncol = ncol, top = common_title)
+  arranged <- gridExtra::grid.arrange(grobs = plot_list, ncol = ncol, top = panel_title_bird(common_title))
   return(arranged)
 } 
 
@@ -1149,38 +1518,6 @@ plot_density_comparison_groups <- function(x, n_curves = NULL, alpha = 0.3, ...)
   common_title <- NULL
   arranged <- gridExtra::grid.arrange(grobs = plot_list, ncol = ncol, top = common_title)
   return(arranged)
-} 
-
-#' Format survival time with appropriate units
-#' @param time Time value
-#' @param decimals Number of decimal places
-#' @param unit Optional unit label; defaults to inferred unit from `x`
-#' @param x Optional `bayesian_imputation` object used to infer the time unit
-#' @return Formatted string
-#' @keywords internal
-format_survival_time <- function(time, decimals = 1, unit = NULL, x = NULL) {
-
-  if (is.null(unit)) {
-    if (!is.null(x) && "model_info" %in% names(x) && "time_unit" %in% names(x$model_info)) {
-      unit <- x$model_info$time_unit
-    } else {
-      unit <- "days" # Default to days if no unit specified and no object
-    }
-  }
-
-  if (is.finite(time)) {
-    if (unit == "days") {
-      return(paste0(round(time, decimals), " days"))
-    } else if (unit == "months") {
-      return(paste0(round(time, decimals), " months"))
-    } else if (unit == "years") {
-      return(paste0(round(time, decimals), " years"))
-    } else {
-      return(paste0(round(time, decimals), " ", unit))
-    }
-  } else {
-    return(paste0(round(time, decimals), " (infinite)"))
-  }
 } 
 
 mcmc_trace_local <- function(draws_array) {

@@ -20,4 +20,3 @@ for log-shape via a Gumbel approximation (sd(log T) ~= pi/(alpha*sqrt(6))), and
 center log-scale to match the observed median using the relation
 median = scale * (log 2)^(1/shape).
 }
-\keyword{internal}

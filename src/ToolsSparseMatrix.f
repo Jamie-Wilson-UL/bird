@@ -201,10 +201,12 @@ c=======================================================================
       double precision a(1),q(1)
       
       qaq=0
-      do 10 i=ibeg,iend
+      do 20 i=ibeg,iend
         do 10 j=ia(i),ia(i+1)-1
-10       if (ja(j).ge.ibeg .and. ja(j).le.iend) 
+          if (ja(j).ge.ibeg .and. ja(j).le.iend)
      $       qaq=qaq+a(j)*q(i+ivbeg)*q(ja(j)+ivbeg)
+10      continue
+20    continue
       return
       end
 
@@ -227,7 +229,7 @@ c=======================================================================
          call rexit("adjadd: option not implemented")
       end if
             
-      do 10 i=i1,i2
+      do 11 i=i1,i2
         rowb=ib(i+j1-i1)
         rowb1=ib(i+j1-i1+1)
         do 10 j=ia(i),ia(i+1)-1
@@ -240,7 +242,8 @@ c=======================================================================
                   goto 20
               endif      
           endif    
-10    continue            
+10      continue
+11    continue
       return
       end
 
@@ -279,9 +282,11 @@ c=======================================================================
       double precision h(id,3),x(12,12)
 
       isize=0
-      do 10 i=1,12
+      do 20 i=1,12
         do 10 j=1,12
-10        x(i,j)=0
+          x(i,j)=0
+10      continue
+20    continue
       do 15 i=1,nhash
       if (h(i,1).ne.0) then
             if(h(i,1).le.12 .and. h(i,2).le.12) then
@@ -318,10 +323,12 @@ c=======================================================================
       if(isize.gt.12)then
          call rexit("matrix too large to print")
       end if
-      do 10 i=1,isize
+      do 11 i=1,isize
         do 10 j=1,isize
-10        x(i,j)=0
-      do 20 i=1,isize
+          x(i,j)=0
+10      continue
+11    continue
+      do 30 i=1,isize
          ii=int(h(i,1))
          jj=int(h(i+1,1))   
          do 20 j=ii,jj-1
@@ -332,7 +339,8 @@ c=======================================================================
             else
             x(i,int(h(j,2)))=h(j,3)
           end if
-20    continue              
+20       continue
+30    continue
 
       do i=1,isize
          do j=1,isize
@@ -357,10 +365,12 @@ c=======================================================================
          call rexit("matrix too large to print")
       end if
       
-      do 10 i=1,isize
+      do 11 i=1,isize
         do 10 j=1,isize
-10        x(i,j)=0
-      do 20 i=1,isize
+          x(i,j)=0
+10      continue
+11    continue
+      do 30 i=1,isize
         do 20 j=ia(i),ia(i+1)-1
            if(ja(j).gt.isize) then
               call intpr("element outside bound",-1,i,1) 
@@ -369,15 +379,14 @@ c=======================================================================
              else
              if (ja(j).ne.0) x(i,ja(j))=a(j)
            end if
-20    continue
+20      continue
+30    continue
 
       do i=1,isize
          do j=1,isize
             call dblepr("x(i,j)",-1,x(i,j),1) 
          end do  
       end do
-30    continue
-
       return
       end
 
@@ -395,10 +404,12 @@ c=======================================================================
          call rexit("matrix too large to print")      
       end if
       
-      do 10 i=1,isize
+      do 11 i=1,isize
         do 10 j=1,isize
-10        x(i,j)=0
-      do 20 i=1,isize
+          x(i,j)=0
+10      continue
+11    continue
+      do 30 i=1,isize
         do 20 j=ia(i),ia(i+1)-1
            if(ju(iju(i)-ia(i)+j).gt.isize) then
              call intpr("element outside bound",-1,i,1)
@@ -407,7 +418,8 @@ c=======================================================================
             else
               if (ju(iju(i)-ia(i)+j).ne.0) x(i,ju(iju(i)-ia(i)+j))=a(j)
           endif
-20    continue
+20      continue
+30    continue
 
       do i=1,isize
          do j=1,isize
@@ -432,10 +444,12 @@ c=======================================================================
          call rexit("matrix too large to print")
       end if
       
-      do 10 i=1,isize
+      do 11 i=1,isize
         do 10 j=1,isize
-10        x(i,j)=0
-      do 20 i=1,isize
+          x(i,j)=0
+10      continue
+11    continue
+      do 30 i=1,isize
         do 20 j=ia(i),ia(i+1)-1
            if(ja(j).gt.isize) then
               call intpr("element outside bound",-1,i,1) 
@@ -443,7 +457,8 @@ c=======================================================================
             else
               if(ja(j).ne.0) x(i,ja(j))=x(i,ja(j))+1
           endif
-20    continue
+20      continue
+30    continue
 
       do i=1,isize
          do j=1,isize
@@ -608,4 +623,3 @@ c=======================================================================
          x(i)=0
       end do
       end
-

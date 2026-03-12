@@ -1,11 +1,73 @@
 # Stan Model Compilation and Management
 # This file handles pre-compilation and caching of Stan models
 
+# Internal helper for looking up model names in generated stanmodels lists.
+stan_model_lookup_candidates <- function(model_name) {
+  unique(c(
+    model_name,
+    paste0(model_name, "_imputation"),
+    paste0("bird_", model_name),
+    paste0("bird_", model_name, "_imputation"),
+    paste0("bayessurvival_", model_name),
+    paste0("bayessurvival_", model_name, "_imputation")
+  ))
+}
+
+# Returns a precompiled model from `stanmodels` (when present), otherwise NULL.
+get_precompiled_stan_model <- function(model_name) {
+  ns <- asNamespace("bird")
+  if (!exists("stanmodels", envir = ns, inherits = FALSE)) {
+    return(NULL)
+  }
+  models <- get("stanmodels", envir = ns, inherits = FALSE)
+  if (!is.list(models)) {
+    # rstantools-generated stanmodels may not always be a plain list
+    # (e.g., simplified by sapply). Coerce while preserving names.
+    models <- as.list(models)
+  }
+  if (length(models) == 0) {
+    return(NULL)
+  }
+
+  hits <- intersect(stan_model_lookup_candidates(model_name), names(models))
+  if (length(hits) == 0) {
+    return(NULL)
+  }
+
+  model <- models[[hits[[1]]]]
+  if (inherits(model, "stanmodel")) model else NULL
+}
+
+# Resolve Stan backend option with backward compatibility for old key.
+get_stan_backend_option <- function() {
+  backend_new <- getOption("bird.stan_backend", NULL)
+  if (!is.null(backend_new)) {
+    return(backend_new)
+  }
+  getOption("bayessurvival.stan_backend", "auto")
+}
+
+# Select backend with option bird.stan_backend = auto|precompiled|runtime
+select_stan_backend <- function(model_name) {
+  backend <- get_stan_backend_option()
+  valid <- c("auto", "precompiled", "runtime")
+  if (!backend %in% valid) {
+    warning(
+      "Invalid option bird.stan_backend='", backend,
+      "'. Falling back to 'auto'."
+    )
+    backend <- "auto"
+  }
+
+  if (backend == "auto") {
+    return(if (!is.null(get_precompiled_stan_model(model_name))) "precompiled" else "runtime")
+  }
+  backend
+}
+
 #' Compile and cache Stan models
 #' @keywords internal
 compile_stan_models <- function() {
-  check_rstan()
-  
   # Define available models
   models <- list(
     weibull = "weibull_imputation.stan",
@@ -15,7 +77,24 @@ compile_stan_models <- function() {
   
   # Compile each model
   for (model_name in names(models)) {
-    stan_file <- system.file("stan", models[[model_name]], package = "bayessurvival")
+    backend <- select_stan_backend(model_name)
+    if (backend == "precompiled") {
+      precompiled <- get_precompiled_stan_model(model_name)
+      if (!is.null(precompiled)) {
+        .bird_env[[paste0(model_name, "_model")]] <- precompiled
+        message("Using precompiled Stan model: ", model_name)
+        next
+      }
+      if (identical(get_stan_backend_option(), "precompiled")) {
+        stop(
+          "Requested precompiled Stan backend but model not found for '",
+          model_name, "'."
+        )
+      }
+    }
+
+    check_rstan()
+    stan_file <- system.file("stan", models[[model_name]], package = "bird")
     
     if (!file.exists(stan_file)) {
       stop("Stan model file not found: ", stan_file)
@@ -24,10 +103,10 @@ compile_stan_models <- function() {
     message("Compiling Stan model: ", model_name)
     
     # Compile model
-    model <- rstan::stan_model(file = stan_file, model_name = paste0("bayessurvival_", model_name))
+    model <- rstan::stan_model(file = stan_file, model_name = paste0("bird_", model_name))
     
     # Store in package environment
-    .bayessurvival_env[[paste0(model_name, "_model")]] <- model
+    .bird_env[[paste0(model_name, "_model")]] <- model
   }
   
   invisible(TRUE)
@@ -41,21 +120,35 @@ get_stan_model <- function(model_name) {
   model_key <- paste0(model_name, "_model")
 
   # Return cached model if already compiled
-  if (exists(model_key, envir = .bayessurvival_env, inherits = FALSE)) {
-    return(.bayessurvival_env[[model_key]])
+  if (exists(model_key, envir = .bird_env, inherits = FALSE)) {
+    return(.bird_env[[model_key]])
+  }
+
+  backend <- select_stan_backend(model_name)
+  if (backend == "precompiled") {
+    model <- get_precompiled_stan_model(model_name)
+    if (is.null(model)) {
+      stop(
+        "Precompiled Stan model not found for '", model_name, "'. ",
+        "If you are developing, set options(bird.stan_backend = 'runtime') ",
+        "or generate package stanmodels via rstantools."
+      )
+    }
+    .bird_env[[model_key]] <- model
+    return(model)
   }
 
   # Compile on demand 
   check_rstan()
   stan_filename <- paste0(model_name, "_imputation.stan")
-  stan_file <- system.file("stan", stan_filename, package = "bayessurvival")
+  stan_file <- system.file("stan", stan_filename, package = "bird")
   if (!nzchar(stan_file) || !file.exists(stan_file)) {
     stop("Stan model file not found: ", stan_filename)
   }
 
   message("Compiling Stan model: ", model_name)
-  model <- rstan::stan_model(file = stan_file, model_name = paste0("bayessurvival_", model_name))
-  .bayessurvival_env[[model_key]] <- model
+  model <- rstan::stan_model(file = stan_file, model_name = paste0("bird_", model_name))
+  .bird_env[[model_key]] <- model
   model
 }
 
@@ -64,13 +157,13 @@ get_stan_model <- function(model_name) {
 #' @keywords internal
 stan_models_ready <- function() {
   required_models <- c("weibull_model", "exponential_model", "lognormal_model")
-  all(sapply(required_models, function(x) exists(x, envir = .bayessurvival_env)))
+  all(sapply(required_models, function(x) exists(x, envir = .bird_env)))
 }
 
 #' Get default priors for a given distribution
 #' @param distribution Distribution name ("weibull", "exponential", "lognormal")
 #' @return List of default prior parameters
-#' @keywords internal
+#' @export
 get_default_priors <- function(distribution = "weibull") {
   switch(distribution,
     "weibull" = list(
@@ -106,7 +199,7 @@ get_default_priors <- function(distribution = "weibull") {
 #' @param distribution Distribution name
 #' @param t_obs Numeric vector of observed event times (>0)
 #' @return List of prior hyperparameters matching prepare_stan_data expectations
-#' @keywords internal
+#' @export
 get_adaptive_priors <- function(distribution = "weibull", t_obs) {
   t_obs <- t_obs[is.finite(t_obs) & t_obs > 0]
   if (length(t_obs) < 2) {

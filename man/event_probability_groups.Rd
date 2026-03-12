@@ -4,16 +4,13 @@
 \alias{event_probability_groups}
 \title{Event probability by clinical time horizons (groups)}
 \usage{
-event_probability_groups(
-  x,
-  times = c(180, 365),
-  method = c("logspline", "ecdf")
-)
+event_probability_groups(x, times = NULL, method = c("logspline", "ecdf"))
 }
 \arguments{
 \item{x}{A \code{bayesian_imputation_groups} object}
 
-\item{times}{Numeric vector of time horizons}
+\item{times}{Optional numeric vector of time horizons. If \code{NULL}, defaults
+are chosen using the first group's \code{time_unit}.}
 
 \item{method}{Estimation method: "logspline" (default) or "ecdf"}
 }

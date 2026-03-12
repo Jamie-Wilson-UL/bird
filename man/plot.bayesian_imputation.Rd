@@ -4,12 +4,30 @@
 \alias{plot.bayesian_imputation}
 \title{Plot method for bayesian_imputation objects}
 \usage{
-\method{plot}{bayesian_imputation}(x, type = "survival", ...)
+\method{plot}{bayesian_imputation}(
+  x,
+  type = "survival",
+  n_curves = 10,
+  alpha = 0.3,
+  show_original = TRUE,
+  n_max = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{A bayesian_imputation object}
 
 \item{type}{Type of plot: "survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison"}
+
+\item{n_curves}{For survival plots: number of imputed curves to display (default: 10)}
+
+\item{alpha}{For survival plots: transparency for imputed curves (default: 0.3)}
+
+\item{show_original}{For survival plots: whether to show original Kaplan-Meier curve (default: TRUE)}
+
+\item{n_max}{Backward-compatible alias:
+for \code{type = "survival"}, treated as \code{n_curves};
+for \code{type = "boxplots_comparison"}, maximum datasets shown.}
 
 \item{...}{Additional arguments passed to plotting functions}
 }

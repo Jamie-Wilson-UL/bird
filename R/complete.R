@@ -108,6 +108,9 @@ complete.bayesian_imputation <- function(object,
   if (is.null(object$imputed_datasets) || length(object$imputed_datasets) == 0) {
     stop("No imputed datasets found in object. Run bayesian_impute() first.")
   }
+
+  time_col <- if (!is.null(object$time_col)) object$time_col else "time"
+  status_col <- if (!is.null(object$status_col)) object$status_col else "status"
   
   n_imputations <- length(object$imputed_datasets)
   
@@ -146,6 +149,11 @@ complete.bayesian_imputation <- function(object,
       
       # Reorder columns to match imputed datasets
       original_with_id <- original_with_id[, imputed_cols]
+      original_with_id <- standardize_complete_column_order(
+        original_with_id,
+        time_col = time_col,
+        status_col = status_col
+      )
     }
     
     selected_datasets <- c(list(original_with_id), selected_datasets)
@@ -167,8 +175,11 @@ complete.bayesian_imputation <- function(object,
     }))
     
     # Reorder columns to put .imp and .id first
-    other_cols <- setdiff(names(long_data), c(".imp", ".id"))
-    long_data <- long_data[, c(".imp", ".id", other_cols)]
+    long_data <- standardize_complete_column_order(
+      long_data,
+      time_col = time_col,
+      status_col = status_col
+    )
     
     return(long_data)
     
@@ -180,6 +191,11 @@ complete.bayesian_imputation <- function(object,
       if (!(".imp" %in% names(selected_datasets[[i]]))) {
         selected_datasets[[i]]$.imp <- dataset_numbers[i]
       }
+      selected_datasets[[i]] <- standardize_complete_column_order(
+        selected_datasets[[i]],
+        time_col = time_col,
+        status_col = status_col
+      )
     }
     
     # If single dataset requested, return data.frame; otherwise return list

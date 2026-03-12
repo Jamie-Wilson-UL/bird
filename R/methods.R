@@ -1,5 +1,31 @@
 # S3 Methods for bayesian_imputation objects
 
+# Default reporting horizons for cumulative event probabilities.
+default_event_time_points <- function(time_unit = "days") {
+  unit <- tolower(time_unit %||% "days")
+  if (unit %in% c("month", "months")) return(c(1, 3, 6, 12))
+  if (unit %in% c("year", "years")) return(c(0.25, 0.5, 1, 2))
+  c(30, 90, 180, 365)
+}
+
+format_time_horizon_label <- function(time_point, time_unit = "days") {
+  value <- as.numeric(time_point)
+  if (!is.finite(value)) return(as.character(time_point))
+  value_label <- if (abs(value - round(value)) < .Machine$double.eps^0.5) {
+    format(round(value), trim = TRUE, scientific = FALSE)
+  } else {
+    format(round(value, 2), trim = TRUE, scientific = FALSE)
+  }
+  paste(value_label, time_unit %||% "days")
+}
+
+default_one_year_equivalent <- function(time_unit = "days") {
+  unit <- tolower(time_unit %||% "days")
+  if (unit %in% c("month", "months")) return(12)
+  if (unit %in% c("year", "years")) return(1)
+  365
+}
+
 #' Print method for bayesian_imputation objects
 #' @param x A bayesian_imputation object
 #' @param ... Additional arguments (unused)
@@ -62,14 +88,15 @@ print.bayesian_imputation <- function(x, ...) {
     cat("\n")
     
     # Cumulative event probabilities at key time points (imputed mean)
-    time_points <- c(30, 90, 180, 365)
+    time_unit <- x$model_info$time_unit %||% "days"
+    time_points <- default_event_time_points(time_unit)
     ep <- tryCatch(event_probability(x, times = time_points), error = function(e) NULL)
     if (!is.null(ep)) {
       cat("Cumulative event probability (imputed mean):\n")
       for (i in seq_along(time_points)) {
         val <- ep$imputed_mean[i]
         if (is.finite(val)) {
-          cat(sprintf("  %d days: %.1f%%\n", time_points[i], 100 * val))
+          cat(sprintf("  %s: %.1f%%\n", format_time_horizon_label(time_points[i], time_unit), 100 * val))
         }
       }
       cat("\n")
@@ -162,21 +189,31 @@ print.bayesian_imputation <- function(x, ...) {
 #' Plot method for bayesian_imputation objects
 #' @param x A bayesian_imputation object
 #' @param type Type of plot: "survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison"
+#' @param n_curves For survival plots: number of imputed curves to display (default: 10)
+#' @param alpha For survival plots: transparency for imputed curves (default: 0.3)
+#' @param show_original For survival plots: whether to show original Kaplan-Meier curve (default: TRUE)
+#' @param n_max Backward-compatible alias:
+#'   for `type = "survival"`, treated as `n_curves`;
+#'   for `type = "boxplots_comparison"`, maximum datasets shown.
 #' @param ... Additional arguments passed to plotting functions
 #' @export
-plot.bayesian_imputation <- function(x, type = "survival", ...) {
+plot.bayesian_imputation <- function(x, type = "survival", n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
   }
+
+  if (!is.null(n_max) && type == "survival") {
+    n_curves <- n_max
+  }
   
   switch(type,
-    "survival" = plot_survival_curves(x, ...),
+    "survival" = plot_survival_curves(x, n_curves = n_curves, alpha = alpha, show_original = show_original, ...),
     "trace" = plot_trace_plots(x, ...),
     "pairs" = plot_pairs(x, ...),
     "posterior" = plot_posterior_censored(x, ...),
     "completed_dataset_summary" = plot_completed_dataset_summary(x, ...),
-    "boxplots_comparison" = plot_boxplots_comparison(x, ...),
+    "boxplots_comparison" = plot_boxplots_comparison(x, n_max = n_max %||% 10, ...),
     "density" = plot_density_comparison(x, ...),
     stop("Unknown plot type: ", type, ". Options: 'survival', 'trace', 'pairs', 'posterior', 'completed_dataset_summary', 'boxplots_comparison', 'density'")
   )
@@ -243,31 +280,37 @@ print.bayesian_imputation_groups <- function(x, ...) {
 
 #' Plot method for bayesian_imputation_groups objects
 #' @param x A bayesian_imputation_groups object
-#' @param type Type of plot ("survival", "group_comparison", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density")
+#' @param type Type of plot ("survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density")
 #' @param combine_groups For survival plots: whether to show all groups on same plot (TRUE) or separate plots (FALSE)
 #' @param n_curves For survival plots: number of imputed curves to show per group (default: 10)
 #' @param alpha For survival plots: transparency for imputed curves
 #' @param show_original For survival plots: whether to show original Kaplan-Meier curves
+#' @param n_max Backward-compatible alias:
+#'   for `type = "survival"`, treated as `n_curves`;
+#'   for `type = "boxplots_comparison"`, maximum datasets shown.
 #' @param ... Additional arguments passed to plotting functions
 #' @export
 plot.bayesian_imputation_groups <- function(x, type = "survival", combine_groups = TRUE, 
-                                           n_curves = 10, alpha = 0.3, show_original = TRUE, ...) {
+                                           n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, ...) {
   
   # Check if we have enough groups to plot
   if (length(x$group_names) < 1) {
     stop("No successful groups to plot")
   }
+
+  if (!is.null(n_max) && type == "survival") {
+    n_curves <- n_max
+  }
   
   switch(type,
     "survival" = plot_survival_curves_by_group_safe(x, n_curves, alpha, show_original, combine_groups, ...),
-    "group_comparison" = plot_group_comparison_panels_safe(x, ...),
     "trace" = plot_individual_groups_safe(x, "trace", ...),
     "pairs" = plot_individual_groups_safe(x, "pairs", ...),
     "posterior" = plot_posterior_censored_groups(x, ...),
     "completed_dataset_summary" = plot_completed_dataset_summary_groups(x, ...),
-    "boxplots_comparison" = plot_boxplots_comparison_groups(x, ...),
+    "boxplots_comparison" = plot_boxplots_comparison_groups(x, n_max = n_max %||% 10, ...),
     "density" = plot_density_comparison_groups(x, ...),
-    stop("Unknown plot type: ", type, ". Options: 'survival', 'group_comparison', 'trace', 'pairs', 'posterior', 'completed_dataset_summary', 'boxplots_comparison', 'density'")
+    stop("Unknown plot type: ", type, ". Options: 'survival', 'trace', 'pairs', 'posterior', 'completed_dataset_summary', 'boxplots_comparison', 'density'")
   )
 }
 
@@ -399,7 +442,8 @@ print_survival_comparison_safe <- function(x, group_metrics) {
   }
   
   # Event probabilities at key time points (from imputed datasets)
-  time_points <- c(30, 90, 180, 365) # days
+  time_unit <- x$group_results[[1]]$model_info$time_unit %||% "days"
+  time_points <- default_event_time_points(time_unit)
   has_any <- FALSE
   rows <- list()
   for (tp in time_points) {
@@ -417,7 +461,7 @@ print_survival_comparison_safe <- function(x, group_metrics) {
   if (has_any) {
     cat("\nCumulative event probability at key time points (imputed mean):\n")
     for (r in rows) {
-      cat(sprintf("  %d days:\n", r$time))
+      cat(sprintf("  %s:\n", format_time_horizon_label(r$time, time_unit)))
       for (group_name in x$group_names) {
         val <- r$vals[group_name]
         if (is.finite(val)) {
@@ -446,7 +490,7 @@ calculate_log_rank_test <- function(object) {
   })
 }
 
-#' Calculate Cox proportional hazards test for group comparison
+#' Calculate pooled Cox hazard-ratio summary for group comparison
 #' @param object bayesian_imputation_groups object
 #' @keywords internal
 calculate_cox_ph_test <- function(object) {
@@ -602,7 +646,7 @@ calculate_median_survival_diff <- function(object) {
 
 #' Calculate survival probability difference at specific time point
 #' @param object bayesian_imputation_groups object
-#' @param time_point Time point in days
+#' @param time_point Time point in the same units as the input data
 #' @keywords internal
 calculate_survival_probability_diff <- function(object, time_point) {
   tryCatch({
@@ -653,8 +697,8 @@ print_comprehensive_group_comparison_safe <- function(object) {
   print_survival_comparison_safe(object, group_metrics)
   
   # Statistical tests
-  cat("\n1. Pooled Cox (Wald) Test:\n")
-  cat("-------------------------------\n")
+  cat("\n1. Global Group Effect (Pooled Cox Wald Test):\n")
+  cat("----------------------------------------------\n")
   log_rank_results <- calculate_log_rank_test(object)
   if (!is.null(log_rank_results$p_value)) {
     cat(sprintf("  Pooled Cox (Wald) P-value: %.4f\n", log_rank_results$p_value))
@@ -666,36 +710,48 @@ print_comprehensive_group_comparison_safe <- function(object) {
   } else {
     cat("  Pooled Cox Wald test could not be calculated.\n")
   }
-  cat("\n2. Hazard Ratios (Cox Proportional Hazards):\n")
-  cat("--------------------------------------\n")
+  cat("\n2. Hazard Ratio Summary (from pooled Cox model):\n")
+  cat("------------------------------------------------\n")
   cox_results <- calculate_cox_ph_test(object)
-  if (!is.null(cox_results$p_value)) {
-    cat(sprintf("  Cox PH Test P-value: %.4f\n", cox_results$p_value))
-    if (cox_results$p_value < 0.05) {
-      cat("  (Statistically significant difference in hazard ratio)\n")
+  if (!is.null(cox_results)) {
+    if (!is.na(cox_results$hazard_ratio)) {
+      cat(sprintf("  Hazard ratio: %.3f\n", cox_results$hazard_ratio))
+      if (!is.na(cox_results$hr_ci_lower) && !is.na(cox_results$hr_ci_upper)) {
+        cat(sprintf("  95%% CI: [%.3f, %.3f]\n", cox_results$hr_ci_lower, cox_results$hr_ci_upper))
+      }
     } else {
-      cat("  (No statistically significant difference in hazard ratio)\n")
+      cat("  Multiple groups detected: a single HR is not shown in this summary.\n")
     }
   } else {
-    cat("  Cox PH Test could not be calculated.\n")
+    cat("  Hazard-ratio summary could not be calculated.\n")
   }
   cat("\n3. Median Survival Difference:\n")
   cat("------------------------------\n")
   median_diff_results <- calculate_median_survival_diff(object)
   if (!is.null(median_diff_results$difference)) {
-    cat(sprintf("  Median Survival Difference: %s\n", format_survival_time(median_diff_results$difference)))
+    unit_source <- object$group_results[[median_diff_results$best_group]]
+    cat(sprintf("  Median Survival Difference: %s\n", format_survival_time(median_diff_results$difference, x = unit_source)))
     cat(sprintf("  Best group: %s | Worst group: %s\n", median_diff_results$best_group, median_diff_results$worst_group))
   } else {
     cat("  Median Survival Difference could not be calculated.\n")
   }
-  cat("\n4. Overall Survival Probability at 1 Year:\n")
+  time_unit <- object$group_results[[1]]$model_info$time_unit %||% "days"
+  one_year_equiv <- default_one_year_equivalent(time_unit)
+  cat("\n4. Overall Survival Probability at 1-Year Equivalent:\n")
   cat("--------------------------------------\n")
-  survival_prob_results <- calculate_survival_probability_diff(object, 365)
+  survival_prob_results <- calculate_survival_probability_diff(object, one_year_equiv)
   if (!is.null(survival_prob_results$difference)) {
-    cat(sprintf("  Survival Probability Difference at 1 Year: %.1f%%\n", survival_prob_results$difference * 100))
+    cat(sprintf(
+      "  Survival Probability Difference at %s: %.1f%%\n",
+      format_time_horizon_label(one_year_equiv, time_unit),
+      survival_prob_results$difference * 100
+    ))
     cat(sprintf("  Best group: %s | Worst group: %s\n", survival_prob_results$best_group, survival_prob_results$worst_group))
   } else {
-    cat("  Survival Probability Difference at 1 Year could not be calculated.\n")
+    cat(sprintf(
+      "  Survival Probability Difference at %s could not be calculated.\n",
+      format_time_horizon_label(one_year_equiv, time_unit)
+    ))
   }
 }
 
@@ -708,6 +764,8 @@ print_comprehensive_group_comparison_safe <- function(object) {
 #' @keywords internal
 combine_group_datasets_safe <- function(object, dataset, format) {
   # Combine datasets from all groups
+  time_col <- object$group_results[[1]]$time_col
+  status_col <- object$group_results[[1]]$status_col
   
   if (format == "list") {
     # Return list of combined datasets
@@ -720,6 +778,11 @@ combine_group_datasets_safe <- function(object, dataset, format) {
         group_data <- object$group_results[[group_name]]$imputed_datasets[[i]]
         combined_data <- rbind(combined_data, group_data)
       }
+      combined_data <- standardize_complete_column_order(
+        combined_data,
+        time_col = time_col,
+        status_col = status_col
+      )
       combined_list[[i]] <- combined_data
     }
     return(combined_list)
@@ -736,6 +799,11 @@ combine_group_datasets_safe <- function(object, dataset, format) {
       group_data <- object$group_results[[group_name]]$imputed_datasets[[dataset]]
       combined_data <- rbind(combined_data, group_data)
     }
+    combined_data <- standardize_complete_column_order(
+      combined_data,
+      time_col = time_col,
+      status_col = status_col
+    )
     return(combined_data)
     
   } else if (format == "long") {
@@ -753,6 +821,11 @@ combine_group_datasets_safe <- function(object, dataset, format) {
     
     # Add row IDs
     combined_data$.id <- seq_len(nrow(combined_data))
+    combined_data <- standardize_complete_column_order(
+      combined_data,
+      time_col = time_col,
+      status_col = status_col
+    )
     return(combined_data)
   }
 } 

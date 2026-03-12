@@ -1,5 +1,5 @@
-Package: bayessurvival
-Title: Bayesian Imputation for Censored Survival Data
+Package: bird
+Title: Bayesian Imputation for Right-Censored Data
 Version: 0.1.0.9000
 Maintainer: Shirin Moghaddam <Shirin.Moghaddam@ul.ie>
 Authors@R: 
@@ -23,25 +23,29 @@ Description: Implements Bayesian imputation methodology for handling right-censo
 License: GPL (>= 2)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
-URL: https://github.com/Jamie-Wilson-UL/bayessurvival
-BugReports: https://github.com/Jamie-Wilson-UL/bayessurvival/issues
+RoxygenNote: 7.3.3
+VignetteBuilder: knitr
+URL: https://github.com/Jamie-Wilson-UL/bird
+BugReports: https://github.com/Jamie-Wilson-UL/bird/issues
 Depends: 
     R (>= 4.1.0)
 Imports:
-    rstan (>= 2.32.0),
-    posterior (>= 1.4.0),
-    survival (>= 3.4.0),
+    checkmate (>= 2.2.0),
     ggplot2 (>= 3.4.0),
+    graphics,
     gridExtra,
     haven,
-    scales,
-    rlang (>= 1.1.0),
-    checkmate (>= 2.2.0),
     logspline (>= 2.1.16),
     methods,
+    posterior (>= 1.4.0),
+    Rcpp (>= 0.12.0),
+    RcppParallel (>= 5.0.1),
+    rlang (>= 1.1.0),
+    rstan (>= 2.32.0),
+    rstantools (>= 2.6.0),
+    scales,
     stats,
-    graphics
+    survival (>= 3.4.0)
 Suggests:
     bayesplot,
     writexl,
@@ -55,5 +59,13 @@ Suggests:
     plotly (>= 4.10.0),
     flexsurv (>= 2.2.0),
     coda (>= 0.19)
-SystemRequirements: C++14
+SystemRequirements: C++17, GNU make
 Config/testthat/edition: 3
+Biarch: true
+LinkingTo: 
+    BH (>= 1.66.0),
+    Rcpp (>= 0.12.0),
+    RcppEigen (>= 0.3.3.3.0),
+    RcppParallel (>= 5.0.1),
+    rstan (>= 2.18.1),
+    StanHeaders (>= 2.18.0)

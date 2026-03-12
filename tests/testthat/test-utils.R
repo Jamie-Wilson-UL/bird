@@ -16,6 +16,6 @@ test_that("safe_eval handles errors appropriately", {
 })
 
 test_that("package environment exists", {
-  expect_true(exists(".bayessurvival_env", envir = asNamespace("bayessurvival")))
-  expect_true(is.environment(.bayessurvival_env))
+  expect_true(exists(".bird_env", envir = asNamespace("bird")))
+  expect_true(is.environment(.bird_env))
 }) 

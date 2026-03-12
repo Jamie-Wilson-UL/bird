@@ -1,4 +1,4 @@
-# Utility functions for bayessurvival package
+# Utility functions for bird package
 
 #' Check if required packages are available
 #' @keywords internal
@@ -40,6 +40,40 @@ format_time <- function(time_seconds) {
   } else {
     return(sprintf("%.1f hours", time_seconds / 3600))
   }
+}
+
+#' Standardize completed dataset column order
+#'
+#' Reorders completed datasets so original/new censor indicators and times are
+#' grouped together for easier inspection:
+#' `original_status`, `status`, `was_censored`, `original_time`, `time`.
+#'
+#' Metadata columns (when present) are kept at the front:
+#' `.imp`, `.id`, `.model`, `dataset_id`.
+#'
+#' @param data Completed dataset (data.frame)
+#' @param time_col Name of imputed/current time column
+#' @param status_col Name of imputed/current status column
+#' @return Reordered data.frame
+#' @keywords internal
+standardize_complete_column_order <- function(data, time_col = "time", status_col = "status") {
+  if (!is.data.frame(data) || ncol(data) == 0) {
+    return(data)
+  }
+
+  cols <- names(data)
+
+  meta_set <- c(".imp", ".id", ".model", "dataset_id")
+  compare_block <- c("original_status", status_col, "was_censored", "original_time", time_col)
+
+  # Always place metadata at the front in a consistent order.
+  ordered_front <- intersect(c(".imp", ".id", ".model", "dataset_id"), cols)
+  ordered_compare <- intersect(compare_block, cols)
+
+  ordered <- unique(c(ordered_front, ordered_compare))
+  rest <- setdiff(cols, ordered)
+
+  data[, c(ordered, rest), drop = FALSE]
 }
 
 #' Safe evaluation with error handling

@@ -28,7 +28,7 @@ export(
 
 \item{include_original}{Whether to include original value columns}
 
-\item{combine}{If TRUE, write a single combined file across imputations. For RDS output, setting combine to FALSE will write one file per dataset when multiple datasets are requested.}
+\item{combine}{If TRUE, write a single combined file across imputations}
 
 \item{...}{Additional arguments passed to writing functions}
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/clinical-metrics.R
 \name{calculate_imputation_summary}
 \alias{calculate_imputation_summary}
-\title{Calculate Clinical Survival Metrics}
+\title{Calculate imputation summary comparing censored vs imputed values}
 \usage{
 calculate_imputation_summary(x)
 }
@@ -13,15 +13,6 @@ calculate_imputation_summary(x)
 List with imputation metrics
 }
 \description{
-Helper functions to compute clinically meaningful survival statistics
-from bayesian_imputation objects
+Calculate imputation summary comparing censored vs imputed values
 }
-\keyword{Calculate}
-\keyword{censored}
-\keyword{comparing}
-\keyword{imputation}
-\keyword{imputed}
 \keyword{internal}
-\keyword{summary}
-\keyword{values}
-\keyword{vs}

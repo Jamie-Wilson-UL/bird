@@ -1466,7 +1466,7 @@ c======================================================================
       DATA  R1, R2 / 0.27597, 0.27846/
 C         generate pair of uniform deviates
 
-      DO 200 emme = 1, N
+      DO 210 emme = 1, N
           DO 200 mu = 1, N
    50 u(1)=ranf()
       u(2)=ranf()
@@ -1484,7 +1484,9 @@ C           reject P if outside acceptance region
       IF (V**2 .GT. -4.0 *ALOG(U(1)) *U(1)**2)  GO TO 50
 C           ratio of P's coordinates is normal deviate
   100 DEVIAT = V/U(1)*VARIANCE
-  200 RMAT(emme,mu) = DEVIAT
+          RMAT(emme,mu) = DEVIAT
+  200 CONTINUE
+  210 CONTINUE
 
       RETURN
       END
@@ -1713,6 +1715,4 @@ c======================================================================
 
       return
       end 
-
-
 

@@ -9,7 +9,7 @@ calculate_survival_probability_diff(object, time_point)
 \arguments{
 \item{object}{bayesian_imputation_groups object}
 
-\item{time_point}{Time point in days}
+\item{time_point}{Time point in the same units as the input data}
 }
 \description{
 Calculate survival probability difference at specific time point

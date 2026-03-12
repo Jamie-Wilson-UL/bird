@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/reference/test_package.html#special-files
 
 library(testthat)
-library(bayessurvival)
+library(bird)
 
-test_check("bayessurvival") 
+test_check("bird") 

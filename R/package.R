@@ -1,4 +1,4 @@
-#' @useDynLib bayessurvival, .registration = TRUE
+#' @useDynLib bird, .registration = TRUE
 #' @keywords internal
 "_PACKAGE"
 
@@ -11,9 +11,14 @@
 #' @importFrom stats aggregate coefficients model.matrix model.response na.fail optimize plnorm rexp rlnorm runif rweibull sd setNames ts uniroot vcov
 #' @importFrom graphics axis hist layout lines par polygon segments
 #' @importFrom methods is
+#' @import methods
 #' @importFrom gridExtra grid.arrange
 #' @importFrom haven write_dta write_sav
 #' @importFrom scales percent
+#' @import Rcpp
+#' @importFrom rstan sampling
+#' @importFrom rstantools rstan_config
+#' @importFrom RcppParallel RcppParallelLibs
 ## usethis namespace: end
 
 # Global variables for ggplot2 NSE
@@ -29,12 +34,12 @@ utils::globalVariables(
 NULL
 
 # Package environment for storing compiled Stan models
-.bayessurvival_env <- new.env(parent = emptyenv())
+.bird_env <- new.env(parent = emptyenv())
 
-#' bayessurvival: Bayesian Imputation for Censored Survival Data
+#' bird: Bayesian Imputation for Right-Censored Data
 #'
 #' @description
-#' The bayessurvival package implements the Bayesian imputation methodology 
+#' The bird package implements the Bayesian imputation methodology 
 #' from Moghaddam et al. (2022) for handling right-censored survival data. 
 #' The package treats censored observations as missing data and uses Bayesian 
 #' methods to generate posterior distributions for each censored observation,

@@ -8,7 +8,7 @@ plot_completed_dataset_summary_groups(
   x,
   dataset_id = NULL,
   alpha = 0.6,
-  group_colors = c("blue", "orange"),
+  group_colors = NULL,
   ...
 )
 }
@@ -19,7 +19,7 @@ plot_completed_dataset_summary_groups(
 
 \item{alpha}{Transparency for overlapping plots}
 
-\item{group_colors}{Color palette for groups}
+\item{group_colors}{Optional color palette for groups (auto-generated if NULL)}
 
 \item{...}{Additional arguments}
 }

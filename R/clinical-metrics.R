@@ -5,6 +5,31 @@
 #' 
 #' @keywords internal
 
+resolve_time_unit_label <- function(x, fallback = "days") {
+  if (!is.null(x) && !is.null(x$model_info) && !is.null(x$model_info$time_unit)) {
+    return(x$model_info$time_unit)
+  }
+  if (!is.null(x) && inherits(x, "survival_data")) {
+    tu <- attr(x, "time_unit")
+    if (!is.null(tu) && nzchar(tu)) return(tu)
+  }
+  fallback
+}
+
+default_clinical_time_points <- function(time_unit = "days") {
+  unit <- tolower(time_unit %||% "days")
+  if (unit %in% c("month", "months")) return(c(12, 24, 60))
+  if (unit %in% c("year", "years")) return(c(1, 2, 5))
+  c(365, 730, 1825)
+}
+
+default_event_probability_times <- function(time_unit = "days") {
+  unit <- tolower(time_unit %||% "days")
+  if (unit %in% c("month", "months")) return(c(6, 12))
+  if (unit %in% c("year", "years")) return(c(0.5, 1))
+  c(180, 365)
+}
+
 #' Calculate imputation summary comparing censored vs imputed values
 #' @param x bayesian_imputation object
 #' @return List with imputation metrics
@@ -101,10 +126,11 @@ calculate_imputation_summary <- function(x) {
 
 #' Calculate survival statistics for original and imputed data
 #' @param x bayesian_imputation object
-#' @param time_points Vector of time points for survival probability estimates
+#' @param time_points Optional vector of time points for survival probability
+#'   estimates. If `NULL`, defaults are chosen using `time_unit`.
 #' @return List with clinical metrics
 #' @keywords internal
-calculate_clinical_metrics <- function(x, time_points = c(365, 730, 1825)) {
+calculate_clinical_metrics <- function(x, time_points = NULL) {
   
   # Input validation
   if (!inherits(x, "bayesian_imputation")) {
@@ -113,6 +139,11 @@ calculate_clinical_metrics <- function(x, time_points = c(365, 730, 1825)) {
   
   if (!requireNamespace("survival", quietly = TRUE)) {
     stop("survival package required for clinical metrics")
+  }
+
+  if (is.null(time_points)) {
+    time_unit <- resolve_time_unit_label(x, fallback = "days")
+    time_points <- default_clinical_time_points(time_unit)
   }
   
   time_var <- x$time_col
@@ -280,6 +311,8 @@ format_survival_prob <- function(prob) {
 #' Format survival time with appropriate units
 #' @param time Time value
 #' @param decimals Number of decimal places
+#' @param unit Optional unit label; defaults to inferred unit from `x`
+#' @param x Optional object used to infer the time unit
 #' @return Formatted string
 #' @keywords internal
 format_survival_time <- function(time, decimals = 1, unit = NULL, x = NULL) {
@@ -305,18 +338,24 @@ format_survival_time <- function(time, decimals = 1, unit = NULL, x = NULL) {
 #' for original observed events and across completed imputed datasets.
 #'
 #' @param x A `bayesian_imputation` object
-#' @param times Numeric vector of time horizons (in the same units as the data)
+#' @param times Optional numeric vector of time horizons (in the same units as
+#'   the data). If `NULL`, defaults are chosen using `time_unit`.
 #' @param method Estimation method: "logspline" (default) or "ecdf" fallback
 #' @return A data.frame with columns: `time`, `original_prob`, `imputed_mean`,
 #'   `imputed_sd`, `imputed_q025`, `imputed_q975`, `n_imputations`
 #' @examples
 #' # event_probability(result, times = c(180, 365))
 #' @export
-event_probability <- function(x, times = c(180, 365), method = c("logspline", "ecdf")) {
+event_probability <- function(x, times = NULL, method = c("logspline", "ecdf")) {
   method <- match.arg(method)
 
   if (!inherits(x, "bayesian_imputation")) {
     stop("x must be a bayesian_imputation object")
+  }
+
+  if (is.null(times)) {
+    time_unit <- resolve_time_unit_label(x, fallback = "days")
+    times <- default_event_probability_times(time_unit)
   }
 
   time_var <- x$time_col
@@ -390,18 +429,25 @@ event_probability <- function(x, times = c(180, 365), method = c("logspline", "e
 #' cumulative distribution function.
 #'
 #' @param x A `bayesian_imputation_groups` object
-#' @param times Numeric vector of time horizons
+#' @param times Optional numeric vector of time horizons. If `NULL`, defaults
+#'   are chosen using the first group's `time_unit`.
 #' @param method Estimation method: "logspline" (default) or "ecdf"
 #' @return A data.frame with columns: `group`, `time`, `original_prob`,
 #'   `imputed_mean`, `imputed_sd`, `imputed_q025`, `imputed_q975`, `n_imputations`
 #' @examples
 #' # event_probability_groups(result_groups, times = c(180, 365))
 #' @export
-event_probability_groups <- function(x, times = c(180, 365), method = c("logspline", "ecdf")) {
+event_probability_groups <- function(x, times = NULL, method = c("logspline", "ecdf")) {
   method <- match.arg(method)
 
   if (!inherits(x, "bayesian_imputation_groups")) {
     stop("x must be a bayesian_imputation_groups object")
+  }
+
+  if (is.null(times)) {
+    ref <- x$group_results[[x$group_names[1]]]
+    time_unit <- resolve_time_unit_label(ref, fallback = "days")
+    times <- default_event_probability_times(time_unit)
   }
 
   rows <- list()

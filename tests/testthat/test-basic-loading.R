@@ -1,5 +1,5 @@
 test_that("package loads", {
-  expect_true(requireNamespace("bayessurvival", quietly = TRUE))
+  expect_true(requireNamespace("bird", quietly = TRUE))
   
   # Check that basic functions are available
   expect_true(exists("impute"))

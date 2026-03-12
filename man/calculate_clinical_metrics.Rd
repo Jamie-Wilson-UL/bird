@@ -4,12 +4,13 @@
 \alias{calculate_clinical_metrics}
 \title{Calculate survival statistics for original and imputed data}
 \usage{
-calculate_clinical_metrics(x, time_points = c(365, 730, 1825))
+calculate_clinical_metrics(x, time_points = NULL)
 }
 \arguments{
 \item{x}{bayesian_imputation object}
 
-\item{time_points}{Vector of time points for survival probability estimates}
+\item{time_points}{Optional vector of time points for survival probability
+estimates. If \code{NULL}, defaults are chosen using \code{time_unit}.}
 }
 \value{
 List with clinical metrics

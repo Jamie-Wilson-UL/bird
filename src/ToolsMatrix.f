@@ -32,7 +32,8 @@ c order. matrix a is n x m, only first ix rows and iy columns are sorted
       j=r
       j1=(l+r)/2
       do 25 k=1,icol
-25    x(k)=a(j1,col(k))
+      x(k)=a(j1,col(k))
+25    continue
 30    do 35 k=1,icol
       a1=a(i,col(k))
       a2=x(k)
@@ -57,7 +58,8 @@ c order. matrix a is n x m, only first ix rows and iy columns are sorted
       do 50 j2=1,iy
       a1=a(i,j2)
       a(i,j2)=a(j,j2)
-50    a(j,j2)=a1
+      a(j,j2)=a1
+50    continue
       i=i+1
       j=j-1
       endif
@@ -677,8 +679,10 @@ C-----------------------------------------------------------------------
 
       DO 10 I = 1, N
         DO 8 J = I, N
-   8      Z(J,I) = A(J,I)
-  10    D(I) = A(N,I)
+          Z(J,I) = A(J,I)
+   8    CONTINUE
+        D(I) = A(N,I)
+  10  CONTINUE
       IF (N .EQ. 1) GO TO 51
       DO 30 II = 2, N
          I = N + 2 - II
@@ -687,24 +691,28 @@ C-----------------------------------------------------------------------
          SCALE = 0.0D0
          IF (L .LT. 2) GO TO 13
          DO 12 K = 1, L
-  12     SCALE = SCALE + DABS(D(K))
+            SCALE = SCALE + DABS(D(K))
+  12     CONTINUE
          IF (SCALE .NE. 0.0D0) GO TO 14
   13     E(I) = D(L)
          DO 135 J = 1, L
             D(J) = Z(L,J)
             Z(I,J) = 0.0D0
-  135       Z(J,I) = 0.0D0
+            Z(J,I) = 0.0D0
+  135    CONTINUE
          GO TO 29
   14     DO 15 K = 1, L
             D(K) = D(K) / SCALE
-  15        H = H + D(K) * D(K)
+            H = H + D(K) * D(K)
+  15     CONTINUE
          F = D(L)
          G = -DSIGN(DSQRT(H),F)
          E(I) = SCALE * G
          H = H - F * G
          D(L) = F - G
          DO 17 J = 1, L
-  17       E(J) = 0.0D0
+            E(J) = 0.0D0
+  17     CONTINUE
          DO 24 J = 1, L
             F = D(J)
             Z(J,I) = F
@@ -713,21 +721,25 @@ C-----------------------------------------------------------------------
             IF (L .LT. JP1) GO TO 22
             DO 20 K = JP1, L
                G = G + Z(K,J) * D(K)
-  20           E(K) = E(K) + Z(K,J) * F
+               E(K) = E(K) + Z(K,J) * F
+  20        CONTINUE
   22        E(J) = G
   24     CONTINUE
          F = 0.0D0
          DO 245 J = 1, L
             E(J) = E(J) / H
-  245       F = F + E(J) * D(J)
+            F = F + E(J) * D(J)
+  245    CONTINUE
          HH = F / (H + H)
          DO 25 J = 1, L
-  25       E(J) = E(J) - HH * D(J)
+            E(J) = E(J) - HH * D(J)
+  25     CONTINUE
          DO 28 J = 1, L
             F = D(J)
             G = E(J)
             DO 26 K = J, L
-  26          Z(K,J) = Z(K,J) - F * E(K) - G * D(K)
+               Z(K,J) = Z(K,J) - F * E(K) - G * D(K)
+  26        CONTINUE
             D(J) = Z(L,J)
             Z(I,J) = 0.0D0
   28     CONTINUE
@@ -740,26 +752,32 @@ C-----------------------------------------------------------------------
          H = D(I)
          IF (H .EQ. 0.0D0) GO TO 38
          DO 33 K = 1, L
-  33     D(K) = Z(K,I) / H
-         DO 36 J = 1, L
+            D(K) = Z(K,I) / H
+  33     CONTINUE
+         DO 37 J = 1, L
             G = 0.0D0
             DO 34 K = 1, L
-  34        G = G + Z(K,I) * Z(K,J)
+               G = G + Z(K,I) * Z(K,J)
+  34        CONTINUE
             DO 36 K = 1, L
                Z(K,J) = Z(K,J) - G * D(K)
   36     CONTINUE
+  37     CONTINUE
   38     DO 40 K = 1, L
-  40     Z(K,I) = 0.0D0
+            Z(K,I) = 0.0D0
+  40     CONTINUE
   50  CONTINUE
   51  DO 52 I = 1, N
          D(I) = Z(N,I)
-  52     Z(N,I) = 0.0D0
+         Z(N,I) = 0.0D0
+  52  CONTINUE
       Z(N,N) = 1.0D0
       E(1) = 0.0D0
 
       IF (N .EQ. 1) GO TO 1001
       DO 100 I = 2, N
-  100 E(I-1) = E(I)
+         E(I-1) = E(I)
+ 100  CONTINUE
       F = 0.0D0
       TST1 = 0.0D0
       E(N) = 0.0D0
@@ -796,7 +814,8 @@ C-----------------------------------------------------------------------
          H = G - D(L)
          IF (L2 .GT. N) GO TO 150
          DO 140 I = L2, N
-  140    D(I) = D(I) - H
+            D(I) = D(I) - H
+ 140     CONTINUE
   150    F = F + H
          P = D(M)
          C = 1.0D0
@@ -832,7 +851,8 @@ C-----------------------------------------------------------------------
             DO 180 K = 1, N
                H = Z(K,I+1)
                Z(K,I+1) = S * Z(K,I) + C * H
-  180          Z(K,I) = C * Z(K,I) - S * H
+               Z(K,I) = C * Z(K,I) - S * H
+  180       CONTINUE
   200    CONTINUE
          P = -S * S2 * C3 * EL1 * E(L) / DL1
          E(L) = S * P
@@ -941,7 +961,8 @@ c+++++Init
       h=1
       do 5 k=1,n
            h=h*k
-5     r(k)=k
+           r(k)=k
+5     continue
 
 c+++++Body
       do 10 k=1,n
@@ -995,6 +1016,4 @@ c+++++Body
 
       return
       end
-
-
 
