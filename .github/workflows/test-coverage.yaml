@@ -21,9 +21,11 @@ jobs:
         with:
           use-public-rspm: true
 
-      - name: Install dependencies
-        run: |
-          Rscript -e 'install.packages(c("covr", "rstan", "posterior", "ggplot2", "gridExtra", "haven", "scales", "rlang", "checkmate", "logspline", "knitr", "testthat"), repos = c("https://packagemanager.posit.co/cran/__linux__/noble/latest", "https://cran.rstudio.com"))'
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::covr
+          needs: coverage
+          dependencies: '"hard"'
 
       # Skip CmdStan installation for CI - tests will skip appropriately
       # - name: Install CmdStan

@@ -6,7 +6,7 @@
 
 ## Overview
 
-`bird` provides Bayesian multiple imputation for right-censored survival data.
+`bird` provides Bayesian imputation for right-censored survival data.
 
 It supports:
 - Parametric models (`weibull`, `exponential`, `lognormal`) via Stan
