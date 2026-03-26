@@ -27,7 +27,8 @@ utils::globalVariables(
     "time", "survival", "type", "dataset_id", "density", "imputed_time",
     "dataset", "group", "y", "ymin", "ymax", "imputed_time_draw",
     "xintercept", "line_type", "lower", "upper", "x_start", "y_start",
-    "x_end", "y_end", "legend_label"
+    "x_end", "y_end", "legend_label",
+    ".model", ".time", "model", "surv_mean", "surv_q025", "surv_q975"
   )
 )
 

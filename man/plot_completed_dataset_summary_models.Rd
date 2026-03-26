@@ -7,6 +7,7 @@
 plot_completed_dataset_summary_models(
   x,
   dataset_id = NULL,
+  panels = "auto",
   alpha = 0.55,
   model_colors = NULL,
   ...
@@ -16,6 +17,10 @@ plot_completed_dataset_summary_models(
 \item{x}{bird_model_comparison object}
 
 \item{dataset_id}{Dataset index to compare (same index used for all models)}
+
+\item{panels}{Which panels to display. Use \code{"auto"} for default behaviour
+(full 4-panel for <=2 models; survival+boxplot for >2 models),
+or any combination of \code{c("hist", "density", "survival", "boxplot")}.}
 
 \item{alpha}{Transparency for overlays}
 

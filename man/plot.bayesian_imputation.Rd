@@ -17,7 +17,7 @@
 \arguments{
 \item{x}{A bayesian_imputation object}
 
-\item{type}{Type of plot: "survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison"}
+\item{type}{Type of plot: "survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density"}
 
 \item{n_curves}{For survival plots: number of imputed curves to display (default: 10)}
 
@@ -29,7 +29,13 @@
 for \code{type = "survival"}, treated as \code{n_curves};
 for \code{type = "boxplots_comparison"}, maximum datasets shown.}
 
-\item{...}{Additional arguments passed to plotting functions}
+\item{...}{Additional arguments passed to plotting functions.
+For \code{type = "completed_dataset_summary"} and \code{type = "density"},
+you can pass \verb{dataset_id = <integer>} to select a specific imputed dataset
+(random if omitted).
+For \code{type = "completed_dataset_summary"}, you can also pass
+\code{panels = c("hist", "density", "survival", "boxplot")}
+(or \code{"auto"} for the default layout).}
 }
 \description{
 Plot method for bayesian_imputation objects

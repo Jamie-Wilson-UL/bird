@@ -498,13 +498,78 @@ plot_posterior_censored <- function(result, obs_id = NULL, dataset_id = NULL, sh
   return(p)
 }
 
-#' Plot completed dataset summary (4-panel plot)
+#' Normalise requested panels for completed dataset summary plots
+#' @param panels Panel selection supplied by user.
+#' @param default_panels Character vector used when `panels = "auto"`.
+#' @param context_label Label used in validation messages.
+#' @keywords internal
+normalize_completed_summary_panels <- function(panels = "auto",
+                                               default_panels = c("hist", "density", "survival", "boxplot"),
+                                               context_label = "completed_dataset_summary") {
+  valid_panels <- c("hist", "density", "survival", "boxplot")
+
+  if (is.null(panels) || (length(panels) == 1 && identical(tolower(as.character(panels)), "auto"))) {
+    return(default_panels)
+  }
+
+  panels <- as.character(panels)
+  if (length(panels) < 1) {
+    stop("`panels` must contain at least one panel name")
+  }
+
+  alias <- c(
+    "histogram" = "hist",
+    "histograms" = "hist",
+    "boxplots" = "boxplot",
+    "box" = "boxplot",
+    "surv" = "survival",
+    "km" = "survival"
+  )
+
+  mapped <- tolower(panels)
+  mapped <- ifelse(mapped %in% names(alias), alias[mapped], mapped)
+  mapped <- unique(mapped)
+
+  invalid <- setdiff(mapped, valid_panels)
+  if (length(invalid) > 0) {
+    stop(
+      "Invalid `panels` for ", context_label, ": ",
+      paste(invalid, collapse = ", "),
+      ". Valid options are: ",
+      paste(valid_panels, collapse = ", "),
+      ", or 'auto'."
+    )
+  }
+
+  mapped
+}
+
+#' Arrange selected completed-summary panels
+#' @param panel_grobs List of ggplot grobs.
+#' @param title_text Title shown above combined panel.
+#' @keywords internal
+arrange_completed_summary_panels <- function(panel_grobs, title_text) {
+  n <- length(panel_grobs)
+  if (n < 1) {
+    stop("At least one panel must be selected")
+  }
+
+  ncol <- if (n == 1) 1 else if (n == 2) 2 else 2
+  do.call(
+    gridExtra::grid.arrange,
+    c(panel_grobs, list(ncol = ncol, top = panel_title_bird(title_text)))
+  )
+}
+
+#' Plot completed dataset summary panels
 #' @param x bayesian_imputation object
 #' @param dataset_id Specific dataset to plot (NULL for random)
+#' @param panels Which panels to display. Use `"auto"` for default 4-panel layout,
+#'   or any combination of `c("hist", "density", "survival", "boxplot")`.
 #' @param ... Additional arguments
 #' @return ggplot object
 #' @keywords internal
-plot_completed_dataset_summary <- function(x, dataset_id = NULL, ...) {
+plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto", ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
@@ -524,93 +589,116 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, ...) {
   time_var <- x$time_col
   status_var <- x$status_col
   
-  # Create 4-panel plot
-  p1 <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
-    ggplot2::geom_histogram(bins = 30, fill = "lightblue", alpha = 0.7) +
-    ggplot2::labs(title = "Histogram", x = "Time", y = "Count")
-  p1 <- style_bird_plot(p1, legend_position = "none", base_size = 11)
-  
-  # Panel 2: Density (fitted with logspline)
-  if (requireNamespace("logspline", quietly = TRUE)) {
-    # Epsilon guard and lbound for positive support
-    x_vals <- dataset[[time_var]]
-    x_vals <- x_vals[is.finite(x_vals) & x_vals >= 0]
-    x_vals <- pmax(x_vals, .Machine$double.eps)
-
-    # Fit logspline with lbound=0; cap knots when available
-    ls_fit <- tryCatch(
-      logspline::logspline(x_vals, lbound = 0, maxknots = 6),
-      error = function(e) logspline::logspline(x_vals, lbound = 0)
-    )
-
-    # Pooled quantile-based grid: original events + selected dataset
-    orig_times <- x$original_data[[x$time_col]]
-    orig_status <- x$original_data[[x$status_col]]
-    orig_events <- orig_times[is.finite(orig_times) & orig_times >= 0 & orig_status == 1]
-    all_times <- c(orig_events, dataset[[time_var]])
-    all_times <- all_times[is.finite(all_times) & all_times >= 0]
-    all_times <- pmax(all_times, .Machine$double.eps)
-
-    if (length(all_times) >= 2) {
-      qlo <- max(0, stats::quantile(all_times, 0.005, na.rm = TRUE))
-      qhi <- stats::quantile(all_times, 0.995, na.rm = TRUE)
-    } else {
-      qlo <- min(all_times, na.rm = TRUE)
-      qhi <- max(all_times, na.rm = TRUE)
-    }
-    if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
-      qlo <- min(all_times, na.rm = TRUE)
-      qhi <- max(all_times, na.rm = TRUE)
-    }
-    x_grid <- seq(qlo, qhi, length.out = 400)
-    y_density <- logspline::dlogspline(x_grid, ls_fit)
-
-    p2 <- ggplot2::ggplot(data.frame(x = x_grid, y = y_density), ggplot2::aes(x = x, y = y)) +
-      ggplot2::geom_line(color = "darkblue", linewidth = 1) +
-      ggplot2::labs(title = "Density", x = "Time", y = "Density")
-    p2 <- style_bird_plot(p2, legend_position = "none", base_size = 11)
-  } else {
-    # Fallback to regular density
-    p2 <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
-      ggplot2::geom_density(fill = "lightgreen", alpha = 0.7) +
-      ggplot2::labs(title = "Density", x = "Time", y = "Density")
-    p2 <- style_bird_plot(p2, legend_position = "none", base_size = 11)
-  }
-  
-  # Panel 3: Survival Curve
-  km_fit <- survival::survfit(
-    as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
-    data = dataset
+  selected_panels <- normalize_completed_summary_panels(
+    panels = panels,
+    default_panels = c("hist", "density", "survival", "boxplot"),
+    context_label = "plot_completed_dataset_summary"
   )
-  
-  p3 <- ggplot2::ggplot(data.frame(time = km_fit$time, survival = km_fit$surv), 
-                        ggplot2::aes(x = time, y = survival)) +
-    ggplot2::geom_step(color = "red", linewidth = 1) +
-    ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability")
-  p3 <- style_bird_plot(p3, legend_position = "none", base_size = 11)
-  
-  # Panel 4: Boxplot
-  p4 <- ggplot2::ggplot(dataset, ggplot2::aes(x = "", y = .data[[time_var]])) +
-    ggplot2::geom_boxplot(fill = "lightcoral", alpha = 0.7) +
-    ggplot2::labs(title = "Boxplot", x = "", y = "Survival Time")
-  p4 <- style_bird_plot(p4, legend_position = "none", base_size = 11)
-  
-  # Combine plots
-  combined_plot <- gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2,
-                                          top = panel_title_bird(paste("Completed Dataset", dataset_id, "Summary")))
-  
-  return(combined_plot)
+
+  panel_grobs <- list()
+
+  if ("hist" %in% selected_panels) {
+    p_hist <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
+      ggplot2::geom_histogram(bins = 30, fill = "lightblue", alpha = 0.7) +
+      ggplot2::labs(title = "Histogram", x = "Time", y = "Count")
+    p_hist <- style_bird_plot(p_hist, legend_position = "none", base_size = 11)
+    panel_grobs$hist <- p_hist
+  }
+
+  if ("density" %in% selected_panels) {
+    if (requireNamespace("logspline", quietly = TRUE)) {
+      x_vals <- dataset[[time_var]]
+      x_vals <- x_vals[is.finite(x_vals) & x_vals >= 0]
+      x_vals <- pmax(x_vals, .Machine$double.eps)
+
+      ls_fit <- tryCatch(
+        logspline::logspline(x_vals, lbound = 0, maxknots = 6),
+        error = function(e) tryCatch(
+          logspline::logspline(x_vals, lbound = 0),
+          error = function(e2) NULL
+        )
+      )
+
+      orig_times <- x$original_data[[x$time_col]]
+      orig_status <- x$original_data[[x$status_col]]
+      orig_events <- orig_times[is.finite(orig_times) & orig_times >= 0 & orig_status == 1]
+      all_times <- c(orig_events, dataset[[time_var]])
+      all_times <- all_times[is.finite(all_times) & all_times >= 0]
+      all_times <- pmax(all_times, .Machine$double.eps)
+
+      if (length(all_times) >= 2) {
+        qlo <- max(0, stats::quantile(all_times, 0.005, na.rm = TRUE))
+        qhi <- stats::quantile(all_times, 0.995, na.rm = TRUE)
+      } else {
+        qlo <- min(all_times, na.rm = TRUE)
+        qhi <- max(all_times, na.rm = TRUE)
+      }
+      if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
+        qlo <- min(all_times, na.rm = TRUE)
+        qhi <- max(all_times, na.rm = TRUE)
+      }
+      x_grid <- seq(qlo, qhi, length.out = 400)
+
+      if (!is.null(ls_fit)) {
+        y_density <- logspline::dlogspline(x_grid, ls_fit)
+      } else {
+        dens <- stats::density(x_vals, from = min(x_grid), to = max(x_grid), n = length(x_grid))
+        y_density <- stats::approx(dens$x, dens$y, xout = x_grid, rule = 2)$y
+      }
+
+      p_density <- ggplot2::ggplot(data.frame(x = x_grid, y = y_density), ggplot2::aes(x = x, y = y)) +
+        ggplot2::geom_line(color = "darkblue", linewidth = 1) +
+        ggplot2::labs(title = "Density", x = "Time", y = "Density")
+      p_density <- style_bird_plot(p_density, legend_position = "none", base_size = 11)
+    } else {
+      p_density <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
+        ggplot2::geom_density(fill = "lightgreen", alpha = 0.7) +
+        ggplot2::labs(title = "Density", x = "Time", y = "Density")
+      p_density <- style_bird_plot(p_density, legend_position = "none", base_size = 11)
+    }
+    panel_grobs$density <- p_density
+  }
+
+  if ("survival" %in% selected_panels) {
+    km_fit <- survival::survfit(
+      as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
+      data = dataset
+    )
+    p_survival <- ggplot2::ggplot(data.frame(time = km_fit$time, survival = km_fit$surv),
+                                  ggplot2::aes(x = time, y = survival)) +
+      ggplot2::geom_step(color = "red", linewidth = 1) +
+      ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability")
+    p_survival <- style_bird_plot(p_survival, legend_position = "none", base_size = 11)
+    panel_grobs$survival <- p_survival
+  }
+
+  if ("boxplot" %in% selected_panels) {
+    p_boxplot <- ggplot2::ggplot(dataset, ggplot2::aes(x = "", y = .data[[time_var]])) +
+      ggplot2::geom_boxplot(fill = "lightcoral", alpha = 0.7) +
+      ggplot2::labs(title = "Boxplot", x = "", y = "Survival Time")
+    p_boxplot <- style_bird_plot(p_boxplot, legend_position = "none", base_size = 11)
+    panel_grobs$boxplot <- p_boxplot
+  }
+
+  ordered_panels <- panel_grobs[selected_panels]
+  arrange_completed_summary_panels(
+    ordered_panels,
+    paste("Completed Dataset", dataset_id, "Summary")
+  )
 }
 
 #' Plot completed dataset summary for groups (overlaid comparison)
 #' @param x bayesian_imputation_groups object
 #' @param dataset_id Dataset ID to plot (NULL for random)
+#' @param panels Which panels to display. Use `"auto"` for default behaviour
+#'   (full 4-panel for <=2 groups; survival+boxplot for >2 groups),
+#'   or any combination of `c("hist", "density", "survival", "boxplot")`.
 #' @param alpha Transparency for overlapping plots
 #' @param group_colors Optional color palette for groups (auto-generated if NULL)
 #' @param ... Additional arguments
 #' @keywords internal
-plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, alpha = 0.6, 
-                                                 group_colors = NULL, ...) {
+plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels = "auto", alpha = 0.6,
+                                                  group_colors = NULL, ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
@@ -645,125 +733,143 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, alpha = 
   time_var <- x$group_results[[1]]$time_col
   status_var <- x$group_results[[1]]$status_col
   
-  # Create 4-panel plot with overlaid groups
-  
-  # Panel 1: Histogram
-  p1 <- ggplot2::ggplot(all_data, ggplot2::aes(x = .data[[time_var]], fill = group)) +
-    ggplot2::geom_histogram(bins = 30, alpha = alpha, position = "identity") +
-    ggplot2::scale_fill_manual(values = group_color_map) +
-    ggplot2::labs(title = "Histogram", x = "Time", y = "Count", fill = "Group")
-  p1 <- style_bird_plot(p1, base_size = 11)
-  
-  # Panel 2: Density (fitted with logspline)
-  if (requireNamespace("logspline", quietly = TRUE)) {
-    # Pooled quantile-based grid across groups and original events
-    time_col <- time_var
-    status_col <- status_var
-    orig_times <- x$original_data[[time_col]]
-    orig_status <- x$original_data[[status_col]]
-    orig_events <- orig_times[is.finite(orig_times) & orig_times >= 0 & orig_status == 1]
-    pooled_times <- c(orig_events, all_data[[time_var]])
-    pooled_times <- pooled_times[is.finite(pooled_times) & pooled_times >= 0]
-    pooled_times <- pmax(pooled_times, .Machine$double.eps)
+  default_panels <- if (length(x$group_names) > 2) {
+    c("survival", "boxplot")
+  } else {
+    c("hist", "density", "survival", "boxplot")
+  }
+  selected_panels <- normalize_completed_summary_panels(
+    panels = panels,
+    default_panels = default_panels,
+    context_label = "plot_completed_dataset_summary_groups"
+  )
+  is_auto_panels <- is.null(panels) ||
+    (length(panels) == 1 && identical(tolower(as.character(panels)), "auto"))
 
-    if (length(pooled_times) >= 2) {
-      qlo <- max(0, stats::quantile(pooled_times, 0.005, na.rm = TRUE))
-      qhi <- stats::quantile(pooled_times, 0.995, na.rm = TRUE)
+  if (length(x$group_names) > 2 && !is_auto_panels &&
+      any(selected_panels %in% c("hist", "density"))) {
+    warning("Using histogram/density with >2 groups may be visually crowded")
+  }
+
+  panel_grobs <- list()
+
+  if ("hist" %in% selected_panels) {
+    p_hist <- ggplot2::ggplot(all_data, ggplot2::aes(x = .data[[time_var]], fill = group)) +
+      ggplot2::geom_histogram(bins = 30, alpha = alpha, position = "identity") +
+      ggplot2::scale_fill_manual(values = group_color_map) +
+      ggplot2::labs(title = "Histogram", x = "Time", y = "Count", fill = "Group")
+    p_hist <- style_bird_plot(p_hist, base_size = 11)
+    panel_grobs$hist <- p_hist
+  }
+
+  if ("density" %in% selected_panels) {
+    if (requireNamespace("logspline", quietly = TRUE)) {
+      time_col <- time_var
+      status_col <- status_var
+      orig_times <- x$original_data[[time_col]]
+      orig_status <- x$original_data[[status_col]]
+      orig_events <- orig_times[is.finite(orig_times) & orig_times >= 0 & orig_status == 1]
+      pooled_times <- c(orig_events, all_data[[time_var]])
+      pooled_times <- pooled_times[is.finite(pooled_times) & pooled_times >= 0]
+      pooled_times <- pmax(pooled_times, .Machine$double.eps)
+
+      if (length(pooled_times) >= 2) {
+        qlo <- max(0, stats::quantile(pooled_times, 0.005, na.rm = TRUE))
+        qhi <- stats::quantile(pooled_times, 0.995, na.rm = TRUE)
+      } else {
+        qlo <- min(pooled_times, na.rm = TRUE)
+        qhi <- max(pooled_times, na.rm = TRUE)
+      }
+      if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
+        qlo <- min(pooled_times, na.rm = TRUE)
+        qhi <- max(pooled_times, na.rm = TRUE)
+      }
+      x_grid <- seq(qlo, qhi, length.out = 400)
+
+      density_data <- data.frame()
+      for (i in seq_along(x$group_names)) {
+        group_name <- x$group_names[i]
+        group_data <- group_datasets[[group_name]]
+        x_vals <- group_data[[time_var]]
+        x_vals <- x_vals[is.finite(x_vals) & x_vals >= 0]
+        x_vals <- pmax(x_vals, .Machine$double.eps)
+        ls_fit <- tryCatch(
+          logspline::logspline(x_vals, lbound = 0, maxknots = 6),
+          error = function(e) tryCatch(
+            logspline::logspline(x_vals, lbound = 0),
+            error = function(e2) NULL
+          )
+        )
+
+        if (!is.null(ls_fit)) {
+          y_density <- logspline::dlogspline(x_grid, ls_fit)
+        } else {
+          dens <- stats::density(x_vals, from = min(x_grid), to = max(x_grid), n = length(x_grid))
+          y_density <- stats::approx(dens$x, dens$y, xout = x_grid, rule = 2)$y
+        }
+
+        density_data <- rbind(density_data, data.frame(
+          x = x_grid,
+          y = y_density,
+          group = group_name,
+          stringsAsFactors = FALSE
+        ))
+      }
+
+      p_density <- ggplot2::ggplot(density_data, ggplot2::aes(x = x, y = y, color = group)) +
+        ggplot2::geom_line(linewidth = 1, alpha = alpha) +
+        ggplot2::scale_color_manual(values = group_color_map) +
+        ggplot2::labs(title = "Density", x = "Time", y = "Density", color = "Group")
+      p_density <- style_bird_plot(p_density, base_size = 11)
     } else {
-      qlo <- min(pooled_times, na.rm = TRUE)
-      qhi <- max(pooled_times, na.rm = TRUE)
+      p_density <- ggplot2::ggplot(all_data, ggplot2::aes(x = .data[[time_var]], fill = group)) +
+        ggplot2::geom_density(alpha = alpha) +
+        ggplot2::scale_fill_manual(values = group_color_map) +
+        ggplot2::labs(title = "Density", x = "Time", y = "Density", fill = "Group")
+      p_density <- style_bird_plot(p_density, base_size = 11)
     }
-    if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
-      qlo <- min(pooled_times, na.rm = TRUE)
-      qhi <- max(pooled_times, na.rm = TRUE)
-    }
-    x_grid <- seq(qlo, qhi, length.out = 400)
+    panel_grobs$density <- p_density
+  }
 
-    density_data <- data.frame()
+  if ("survival" %in% selected_panels) {
+    survival_data <- data.frame()
     for (i in seq_along(x$group_names)) {
       group_name <- x$group_names[i]
       group_data <- group_datasets[[group_name]]
-      x_vals <- group_data[[time_var]]
-      x_vals <- x_vals[is.finite(x_vals) & x_vals >= 0]
-      x_vals <- pmax(x_vals, .Machine$double.eps)
-      ls_fit <- tryCatch(
-        logspline::logspline(x_vals, lbound = 0, maxknots = 6),
-        error = function(e) logspline::logspline(x_vals, lbound = 0)
+      km_fit <- survival::survfit(
+        as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
+        data = group_data
       )
-      y_density <- logspline::dlogspline(x_grid, ls_fit)
-
-      density_data <- rbind(density_data, data.frame(
-        x = x_grid,
-        y = y_density,
+      survival_data <- rbind(survival_data, data.frame(
+        time = km_fit$time,
+        survival = km_fit$surv,
         group = group_name,
         stringsAsFactors = FALSE
       ))
     }
 
-    p2 <- ggplot2::ggplot(density_data, ggplot2::aes(x = x, y = y, color = group)) +
-      ggplot2::geom_line(linewidth = 1, alpha = alpha) +
+    p_survival <- ggplot2::ggplot(survival_data, ggplot2::aes(x = time, y = survival, color = group)) +
+      ggplot2::geom_step(linewidth = 1, alpha = alpha) +
       ggplot2::scale_color_manual(values = group_color_map) +
-      ggplot2::labs(title = "Density", x = "Time", y = "Density", color = "Group")
-    p2 <- style_bird_plot(p2, base_size = 11)
-  } else {
-    # Fallback to regular density
-    p2 <- ggplot2::ggplot(all_data, ggplot2::aes(x = .data[[time_var]], fill = group)) +
-      ggplot2::geom_density(alpha = alpha) +
-      ggplot2::scale_fill_manual(values = group_color_map) +
-      ggplot2::labs(title = "Density", x = "Time", y = "Density", fill = "Group")
-    p2 <- style_bird_plot(p2, base_size = 11)
-  }
-  
-  # Panel 3: Survival Curve
-  survival_data <- data.frame()
-  
-  for (i in seq_along(x$group_names)) {
-    group_name <- x$group_names[i]
-    group_data <- group_datasets[[group_name]]
-    
-    # Calculate survival curve
-    km_fit <- survival::survfit(
-      as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
-      data = group_data
-    )
-    
-    survival_data <- rbind(survival_data, data.frame(
-      time = km_fit$time,
-      survival = km_fit$surv,
-      group = group_name,
-      stringsAsFactors = FALSE
-    ))
-  }
-  
-  p3 <- ggplot2::ggplot(survival_data, ggplot2::aes(x = time, y = survival, color = group)) +
-    ggplot2::geom_step(linewidth = 1, alpha = alpha) +
-    ggplot2::scale_color_manual(values = group_color_map) +
-    ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability", color = "Group")
-  p3 <- style_bird_plot(p3, base_size = 11)
-  
-  # Panel 4: Boxplots
-  p4 <- ggplot2::ggplot(all_data, ggplot2::aes(x = group, y = .data[[time_var]], fill = group)) +
-    ggplot2::geom_boxplot(alpha = alpha) +
-    ggplot2::scale_fill_manual(values = group_color_map) +
-    ggplot2::labs(title = "Boxplots", x = "Group", y = "Survival Time", fill = "Group")
-  p4 <- style_bird_plot(p4, base_size = 11)
-  
-  # For >2 groups, simplify to avoid overcrowded histogram/density overlays
-  if (length(x$group_names) > 2) {
-    combined_plot <- gridExtra::grid.arrange(
-      p3, p4, ncol = 2,
-      top = panel_title_bird(paste("Completed Dataset", dataset_id, "Summary - Group Comparison"))
-    )
-    return(combined_plot)
+      ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability", color = "Group")
+    p_survival <- style_bird_plot(p_survival, base_size = 11)
+    panel_grobs$survival <- p_survival
   }
 
-  # Keep full 4-panel comparison for 2 groups
-  combined_plot <- gridExtra::grid.arrange(
-    p1, p2, p3, p4, ncol = 2,
-    top = panel_title_bird(paste("Completed Dataset", dataset_id, "Summary - Group Comparison"))
+  if ("boxplot" %in% selected_panels) {
+    p_boxplot <- ggplot2::ggplot(all_data, ggplot2::aes(x = group, y = .data[[time_var]], fill = group)) +
+      ggplot2::geom_boxplot(alpha = alpha) +
+      ggplot2::scale_fill_manual(values = group_color_map) +
+      ggplot2::labs(title = "Boxplots", x = "Group", y = "Survival Time", fill = "Group")
+    p_boxplot <- style_bird_plot(p_boxplot, base_size = 11)
+    panel_grobs$boxplot <- p_boxplot
+  }
+
+  ordered_panels <- panel_grobs[selected_panels]
+  arrange_completed_summary_panels(
+    ordered_panels,
+    paste("Completed Dataset", dataset_id, "Summary - Group Comparison")
   )
-  
-  return(combined_plot)
 }
 
 #' Plot survival curves across compared models
@@ -897,14 +1003,208 @@ plot_survival_curves_models <- function(x, show_original = TRUE, n_grid = 200, a
     ggplot2::theme(plot.caption = ggplot2::element_text(size = 9, color = "gray40", hjust = 0))
 }
 
+#' Plot boxplots comparison across models
+#' @param x bird_model_comparison object
+#' @param n_max Number of datasets to sample (default: 10)
+#' @param dataset_indices Optional dataset indices to include (shared across models)
+#' @param model_colors Optional named/un-named vector of colors for models
+#' @param ... Additional arguments (unused)
+#' @keywords internal
+plot_boxplots_comparison_models <- function(x, n_max = 10, dataset_indices = NULL, model_colors = NULL, ...) {
+  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    stop("gridExtra package required for arranging plots")
+  }
+
+  model_names <- x$model_names
+  color_map <- resolve_model_colors(model_names, model_colors)
+  time_var <- x$time_col
+
+  n_per_model <- vapply(x$model_results, function(res) length(res$imputed_datasets), integer(1))
+  n_common <- min(n_per_model)
+  if (n_common < 1) {
+    stop("No completed datasets available for model comparison")
+  }
+
+  if (is.null(dataset_indices)) {
+    k <- min(n_max, n_common)
+    dataset_indices <- sort(sample(seq_len(n_common), k))
+  } else {
+    if (!is.numeric(dataset_indices) || length(dataset_indices) < 1) {
+      stop("dataset_indices must be a non-empty numeric vector")
+    }
+    dataset_indices <- sort(unique(as.integer(dataset_indices)))
+    if (any(dataset_indices < 1) || any(dataset_indices > n_common)) {
+      stop("dataset_indices must be between 1 and ", n_common)
+    }
+  }
+
+  all_times <- c()
+  for (nm in model_names) {
+    for (i in dataset_indices) {
+      all_times <- c(all_times, x$model_results[[nm]]$imputed_datasets[[i]][[time_var]])
+    }
+  }
+  all_times <- all_times[is.finite(all_times)]
+  xr <- range(all_times)
+  if (!is.finite(xr[1]) || !is.finite(xr[2]) || identical(xr[1], xr[2])) {
+    xr <- c(0, max(all_times, na.rm = TRUE) * 1.05)
+    if (!is.finite(xr[2])) xr <- c(0, 1)
+  }
+
+  grobs <- list()
+  for (nm in model_names) {
+    fit <- x$model_results[[nm]]
+    panel_data <- do.call(rbind, lapply(dataset_indices, function(i) {
+      ds <- fit$imputed_datasets[[i]]
+      data.frame(
+        time = ds[[time_var]],
+        dataset = factor(paste("Dataset", i), levels = paste("Dataset", dataset_indices)),
+        stringsAsFactors = FALSE
+      )
+    }))
+
+    p <- ggplot2::ggplot(panel_data, ggplot2::aes(y = dataset, x = time)) +
+      ggplot2::geom_boxplot(fill = grDevices::adjustcolor(color_map[[nm]], alpha.f = 0.45),
+                            outlier.alpha = 0.3) +
+      ggplot2::coord_cartesian(xlim = xr) +
+      ggplot2::labs(
+        title = paste0("Model: ", nm),
+        subtitle = paste("Boxplots for", length(dataset_indices), "datasets"),
+        x = "Survival Time",
+        y = "Imputed Dataset"
+      )
+    p <- style_bird_plot(p, legend_position = "none", base_size = 11)
+    grobs[[length(grobs) + 1]] <- p
+  }
+
+  gridExtra::grid.arrange(
+    grobs = grobs,
+    ncol = min(2, length(grobs)),
+    top = panel_title_bird("Distribution of Survival Times Across Imputed Datasets -- Models")
+  )
+}
+
+#' Plot density comparison across models (single selected dataset)
+#' @param x bird_model_comparison object
+#' @param dataset_id Dataset index used across all models (NULL for random)
+#' @param model_colors Optional named/un-named vector of colors for models
+#' @param ... Additional arguments (unused)
+#' @keywords internal
+plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = NULL, ...) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("ggplot2 package required for plotting")
+  }
+  if (!requireNamespace("logspline", quietly = TRUE)) {
+    stop("logspline package required for density comparison")
+  }
+
+  model_names <- x$model_names
+  color_map <- resolve_model_colors(model_names, model_colors)
+  time_var <- x$time_col
+  status_var <- x$status_col
+
+  n_per_model <- vapply(x$model_results, function(res) length(res$imputed_datasets), integer(1))
+  n_common <- min(n_per_model)
+  if (n_common < 1) {
+    stop("No completed datasets available for model comparison")
+  }
+  if (is.null(dataset_id)) {
+    dataset_id <- sample(seq_len(n_common), 1)
+  }
+  if (!is.numeric(dataset_id) || length(dataset_id) != 1 || dataset_id < 1 || dataset_id > n_common) {
+    stop("dataset_id must be between 1 and ", n_common)
+  }
+  dataset_id <- as.integer(dataset_id)
+
+  selected_times <- c()
+  for (nm in model_names) {
+    selected_times <- c(selected_times, x$model_results[[nm]]$imputed_datasets[[dataset_id]][[time_var]])
+  }
+  selected_times <- selected_times[is.finite(selected_times) & selected_times >= 0]
+  observed_events <- x$original_data[[time_var]][x$original_data[[status_var]] == 1]
+  observed_events <- observed_events[is.finite(observed_events) & observed_events >= 0]
+  if (length(observed_events) < 2) {
+    observed_events <- x$original_data[[time_var]]
+    observed_events <- observed_events[is.finite(observed_events) & observed_events >= 0]
+  }
+  if (length(observed_events) < 2) {
+    stop("Need at least two observed times to compute model density comparison")
+  }
+
+  x_range <- range(c(observed_events, selected_times), finite = TRUE)
+  x_range[1] <- max(0, x_range[1])
+  x_grid <- seq(x_range[1], x_range[2], length.out = 300)
+
+  density_on_grid <- function(values, grid) {
+    values <- values[is.finite(values)]
+    if (length(values) < 2) {
+      return(rep(NA_real_, length(grid)))
+    }
+    ls_fit <- tryCatch(
+      logspline::logspline(values, lbound = 0, maxknots = 6),
+      error = function(e) tryCatch(
+        logspline::logspline(values, lbound = 0),
+        error = function(e2) NULL
+      )
+    )
+    if (!is.null(ls_fit)) {
+      return(logspline::dlogspline(grid, ls_fit))
+    }
+    dens <- stats::density(values, from = min(grid), to = max(grid), n = length(grid))
+    stats::approx(dens$x, dens$y, xout = grid, rule = 2)$y
+  }
+
+  plot_data <- data.frame(
+    x = x_grid,
+    y = density_on_grid(observed_events, x_grid),
+    curve = "Original",
+    stringsAsFactors = FALSE
+  )
+  for (nm in model_names) {
+    vals <- x$model_results[[nm]]$imputed_datasets[[dataset_id]][[time_var]]
+    vals <- vals[is.finite(vals) & vals >= 0]
+    vals <- pmax(vals, .Machine$double.eps)
+    if (length(vals) < 2) next
+    plot_data <- rbind(plot_data, data.frame(
+      x = x_grid,
+      y = density_on_grid(vals, x_grid),
+      curve = nm,
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  manual_cols <- c("Original" = "black", unname(color_map))
+  names(manual_cols) <- c("Original", names(color_map))
+
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = curve)) +
+    ggplot2::geom_line(linewidth = 1) +
+    ggplot2::scale_color_manual(values = manual_cols) +
+    ggplot2::labs(
+      title = "Density Comparison Across Models",
+      subtitle = paste0("Completed dataset ", dataset_id),
+      x = paste0("Time (", x$model_info$time_unit %||% "days", ")"),
+      y = "Density",
+      color = NULL
+    )
+  style_bird_plot(
+    p,
+    legend_position = c(0.98, 0.98),
+    legend_justification = c(1, 1),
+    base_size = 12
+  )
+}
+
 #' Plot completed dataset summary for model comparison
 #' @param x bird_model_comparison object
 #' @param dataset_id Dataset index to compare (same index used for all models)
+#' @param panels Which panels to display. Use `"auto"` for default behaviour
+#'   (full 4-panel for <=2 models; survival+boxplot for >2 models),
+#'   or any combination of `c("hist", "density", "survival", "boxplot")`.
 #' @param alpha Transparency for overlays
 #' @param model_colors Optional named/un-named vector of colors for models
 #' @param ... Additional arguments (unused)
 #' @keywords internal
-plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, alpha = 0.55, model_colors = NULL, ...) {
+plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels = "auto", alpha = 0.55, model_colors = NULL, ...) {
   if (!requireNamespace("gridExtra", quietly = TRUE)) {
     stop("gridExtra package required for arranging plots")
   }
@@ -949,61 +1249,129 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, alpha = 
     )
   }))
 
-  # Survival panel data from selected completed dataset per model
-  surv_data <- data.frame()
-  for (nm in model_names) {
-    d <- model_datasets[[nm]]
-    km <- survival::survfit(
-      as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
-      data = d
-    )
-    surv_data <- rbind(surv_data, data.frame(
-      time = km$time,
-      survival = km$surv,
-      model = nm,
-      stringsAsFactors = FALSE
-    ))
+  default_panels <- if (n_models <= 2) {
+    c("hist", "density", "survival", "boxplot")
+  } else {
+    c("survival", "boxplot")
+  }
+  selected_panels <- normalize_completed_summary_panels(
+    panels = panels,
+    default_panels = default_panels,
+    context_label = "plot_completed_dataset_summary_models"
+  )
+  is_auto_panels <- is.null(panels) ||
+    (length(panels) == 1 && identical(tolower(as.character(panels)), "auto"))
+  if (n_models > 2 && !is_auto_panels && any(selected_panels %in% c("hist", "density"))) {
+    warning("Using histogram/density with >2 models may be visually crowded")
   }
 
-  p_surv <- ggplot2::ggplot(surv_data, ggplot2::aes(x = time, y = survival, color = model)) +
-    ggplot2::geom_step(linewidth = 1) +
-    ggplot2::scale_color_manual(values = color_map) +
-    ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability", color = "Model")
-  p_surv <- style_bird_plot(p_surv, base_size = 11)
+  panel_grobs <- list()
 
-  p_box <- ggplot2::ggplot(all_data, ggplot2::aes(x = .model, y = .time, fill = .model)) +
-      ggplot2::geom_boxplot(alpha = alpha) +
-    ggplot2::scale_fill_manual(values = color_map) +
-      ggplot2::labs(title = "Boxplots", x = "Model", y = "Survival Time", fill = "Model")
-  p_box <- style_bird_plot(p_box, base_size = 11)
-
-  # For two models, keep full 4-panel diagnostic view; for >2 simplify to avoid clutter.
-  if (n_models <= 2) {
+  if ("hist" %in% selected_panels) {
     p_hist <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, fill = .model)) +
       ggplot2::geom_histogram(bins = 30, alpha = alpha, position = "identity") +
       ggplot2::scale_fill_manual(values = color_map) +
       ggplot2::labs(title = "Histogram", x = "Time", y = "Count", fill = "Model")
     p_hist <- style_bird_plot(p_hist, base_size = 11)
-
-    p_dens <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, color = .model, fill = .model)) +
-      ggplot2::geom_density(alpha = alpha * 0.5) +
-      ggplot2::scale_color_manual(values = color_map) +
-      ggplot2::scale_fill_manual(values = color_map) +
-      ggplot2::labs(title = "Density", x = "Time", y = "Density", color = "Model", fill = "Model")
-    p_dens <- style_bird_plot(p_dens, base_size = 11)
-
-    return(gridExtra::grid.arrange(
-      p_hist, p_dens, p_surv, p_box, ncol = 2,
-      top = panel_title_bird(paste("Completed Dataset", dataset_id, "Summary - Model Comparison"))
-    ))
+    panel_grobs$hist <- p_hist
   }
 
-  gridExtra::grid.arrange(
-    p_surv, p_box, ncol = 2,
-    top = panel_title_bird(paste(
-      "Completed Dataset", dataset_id,
-      "Summary - Model Comparison (simplified for", n_models, "models)"
-    ))
+  if ("density" %in% selected_panels) {
+    # Use logspline curves (line-only) for consistency with group comparison style.
+    pooled_times <- c(all_data$.time, x$original_data[[time_var]][x$original_data[[status_var]] == 1])
+    pooled_times <- pooled_times[is.finite(pooled_times) & pooled_times >= 0]
+    pooled_times <- pmax(pooled_times, .Machine$double.eps)
+
+    if (length(pooled_times) >= 2) {
+      qlo <- max(0, stats::quantile(pooled_times, 0.005, na.rm = TRUE))
+      qhi <- stats::quantile(pooled_times, 0.995, na.rm = TRUE)
+    } else {
+      qlo <- min(pooled_times, na.rm = TRUE)
+      qhi <- max(pooled_times, na.rm = TRUE)
+    }
+    if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
+      qlo <- min(pooled_times, na.rm = TRUE)
+      qhi <- max(pooled_times, na.rm = TRUE)
+    }
+    x_grid <- seq(qlo, qhi, length.out = 400)
+
+    density_data <- data.frame()
+    for (nm in model_names) {
+      model_vals <- model_datasets[[nm]][[time_var]]
+      model_vals <- model_vals[is.finite(model_vals) & model_vals >= 0]
+      model_vals <- pmax(model_vals, .Machine$double.eps)
+
+      y_density <- NULL
+      if (requireNamespace("logspline", quietly = TRUE)) {
+        ls_fit <- tryCatch(
+          logspline::logspline(model_vals, lbound = 0, maxknots = 6),
+          error = function(e) tryCatch(
+            logspline::logspline(model_vals, lbound = 0),
+            error = function(e2) NULL
+          )
+        )
+        if (!is.null(ls_fit)) {
+          y_density <- logspline::dlogspline(x_grid, ls_fit)
+        }
+      }
+      if (is.null(y_density)) {
+        dens <- stats::density(model_vals, from = min(x_grid), to = max(x_grid), n = length(x_grid))
+        y_density <- stats::approx(dens$x, dens$y, xout = x_grid, rule = 2)$y
+      }
+
+      density_data <- rbind(density_data, data.frame(
+        x = x_grid,
+        y = y_density,
+        model = nm,
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    p_density <- ggplot2::ggplot(density_data, ggplot2::aes(x = x, y = y, color = model)) +
+      ggplot2::geom_line(linewidth = 1, alpha = alpha) +
+      ggplot2::scale_color_manual(values = color_map) +
+      ggplot2::labs(title = "Density", x = "Time", y = "Density", color = "Model")
+    p_density <- style_bird_plot(p_density, base_size = 11)
+    panel_grobs$density <- p_density
+  }
+
+  if ("survival" %in% selected_panels) {
+    surv_data <- data.frame()
+    for (nm in model_names) {
+      d <- model_datasets[[nm]]
+      km <- survival::survfit(
+        as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
+        data = d
+      )
+      surv_data <- rbind(surv_data, data.frame(
+        time = km$time,
+        survival = km$surv,
+        model = nm,
+        stringsAsFactors = FALSE
+      ))
+    }
+
+    p_survival <- ggplot2::ggplot(surv_data, ggplot2::aes(x = time, y = survival, color = model)) +
+      ggplot2::geom_step(linewidth = 1) +
+      ggplot2::scale_color_manual(values = color_map) +
+      ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability", color = "Model")
+    p_survival <- style_bird_plot(p_survival, base_size = 11)
+    panel_grobs$survival <- p_survival
+  }
+
+  if ("boxplot" %in% selected_panels) {
+    p_boxplot <- ggplot2::ggplot(all_data, ggplot2::aes(x = .model, y = .time, fill = .model)) +
+      ggplot2::geom_boxplot(alpha = alpha) +
+      ggplot2::scale_fill_manual(values = color_map) +
+      ggplot2::labs(title = "Boxplots", x = "Model", y = "Survival Time", fill = "Model")
+    p_boxplot <- style_bird_plot(p_boxplot, base_size = 11)
+    panel_grobs$boxplot <- p_boxplot
+  }
+
+  ordered_panels <- panel_grobs[selected_panels]
+  arrange_completed_summary_panels(
+    ordered_panels,
+    paste("Completed Dataset", dataset_id, "Summary - Model Comparison")
   )
 }
 
@@ -1050,12 +1418,13 @@ survival_step_at_grid <- function(km, grid) {
 
 #' Plot density comparison using logspline
 #' @param x bayesian_imputation object
-#' @param n_curves Number of imputed curves to show (NULL for all)
-#' @param alpha Transparency for imputed curves
+#' @param dataset_id Dataset index to use for the imputed density curve (NULL for random)
+#' @param n_curves Deprecated and ignored (kept for backward compatibility)
+#' @param alpha Deprecated and ignored (kept for backward compatibility)
 #' @param ... Additional arguments
 #' @return ggplot object
 #' @keywords internal
-plot_density_comparison <- function(x, n_curves = NULL, alpha = 0.3, ...) {
+plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha = 0.3, ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
@@ -1066,72 +1435,79 @@ plot_density_comparison <- function(x, n_curves = NULL, alpha = 0.3, ...) {
   }
   
   time_var <- x$time_col
+  n_datasets <- length(x$imputed_datasets)
+  if (n_datasets < 1) {
+    stop("No imputed datasets available for density plot")
+  }
+  
+  if (is.null(dataset_id)) {
+    dataset_id <- sample(seq_len(n_datasets), 1)
+  }
+  if (!is.numeric(dataset_id) || length(dataset_id) != 1 || !is.finite(dataset_id)) {
+    stop("dataset_id must be a single numeric value between 1 and ", n_datasets)
+  }
+  dataset_id <- as.integer(dataset_id)
+  if (dataset_id < 1 || dataset_id > n_datasets) {
+    stop("dataset_id must be between 1 and ", n_datasets)
+  }
   
   # Original data density
   original_data <- x$original_data[x$original_data[[x$status_col]] == 1, ]  # Observed events only
-  ls_orig <- tryCatch(
-    logspline::logspline(original_data[[time_var]], lbound = 0, maxknots = 6),
-    error = function(e) logspline::logspline(original_data[[time_var]], lbound = 0)
-  )
+  if (nrow(original_data) < 2) {
+    stop("Need at least two observed events to compute density plot")
+  }
+  selected_dataset <- x$imputed_datasets[[dataset_id]]
   
   # Create grid for plotting (stabilised bounds)
   x_range <- range(
-    c(original_data[[time_var]], unlist(lapply(x$imputed_datasets, function(d) d[[time_var]]))),
+    c(original_data[[time_var]], selected_dataset[[time_var]]),
     finite = TRUE
   )
   x_range[1] <- max(0, x_range[1])
   x_grid <- seq(x_range[1], x_range[2], length.out = 200)
   
-  # Original density
-  y_orig <- logspline::dlogspline(x_grid, ls_orig)
-  
-  # Imputed densities
-  n_show <- if (is.null(n_curves)) length(x$imputed_datasets) else min(n_curves, length(x$imputed_datasets))
-  selected_datasets <- sample(x$imputed_datasets, n_show)
-  
-  imputed_densities <- matrix(NA, nrow = length(x_grid), ncol = n_show)
-  
-  for (i in 1:n_show) {
-    ls_imp <- tryCatch(
-      logspline::logspline(selected_datasets[[i]][[time_var]], lbound = 0, maxknots = 6),
-      error = function(e) logspline::logspline(selected_datasets[[i]][[time_var]], lbound = 0)
+  density_on_grid <- function(values, grid) {
+    ls_fit <- tryCatch(
+      logspline::logspline(values, lbound = 0, maxknots = 6),
+      error = function(e) tryCatch(
+        logspline::logspline(values, lbound = 0),
+        error = function(e2) NULL
+      )
     )
-    imputed_densities[, i] <- logspline::dlogspline(x_grid, ls_imp)
+    
+    if (!is.null(ls_fit)) {
+      return(logspline::dlogspline(grid, ls_fit))
+    }
+    
+    dens <- stats::density(values, from = min(grid), to = max(grid), n = length(grid))
+    stats::approx(dens$x, dens$y, xout = grid, rule = 2)$y
   }
   
-  # Calculate mean and confidence intervals
-  mean_imp <- rowMeans(imputed_densities)
-  ci_lower <- apply(imputed_densities, 1, quantile, 0.025)
-  ci_upper <- apply(imputed_densities, 1, quantile, 0.975)
+  # Original density
+  y_orig <- density_on_grid(original_data[[time_var]], x_grid)
+  
+  # Imputed density (single selected dataset)
+  y_imp <- density_on_grid(selected_dataset[[time_var]], x_grid)
   
   # Create plot data
+  imputed_label <- paste0("Imputed (dataset ", dataset_id, ")")
   plot_data <- data.frame(
     x = rep(x_grid, 2),
-    y = c(y_orig, mean_imp),
-    type = rep(c("Original", "Imputed (mean)"), each = length(x_grid)),
+    y = c(y_orig, y_imp),
+    type = rep(c("Original", imputed_label), each = length(x_grid)),
     stringsAsFactors = FALSE
   )
   
   # Create plot 
   time_unit <- x$model_info$time_unit %||% "days"
-  ribbon_caption <- paste0(
-    "Shaded band: pointwise 95% interval (2.5% to 97.5%) across ",
-    n_show, " imputed density curves"
-  )
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = type)) +
     ggplot2::geom_line(linewidth = 0.9) +
-    ggplot2::geom_ribbon(
-      data = data.frame(x = x_grid, ymin = ci_lower, ymax = ci_upper),
-      ggplot2::aes(x = x, ymin = ymin, ymax = ymax),
-      fill = "#7a7a7a", alpha = 0.2, inherit.aes = FALSE
-    ) +
-    ggplot2::scale_color_manual(values = c("Original" = "black", "Imputed (mean)" = "#7a7a7a"), name = NULL) +
+    ggplot2::scale_color_manual(values = stats::setNames(c("black", "#7a7a7a"), c("Original", imputed_label)), name = NULL) +
     ggplot2::labs(
       title = NULL,
       subtitle = NULL,
       x = paste0("Time (", time_unit, ")"),
-      y = "Density",
-      caption = ribbon_caption
+      y = "Density"
     ) +
     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
   p <- style_bird_plot(
@@ -1143,8 +1519,7 @@ plot_density_comparison <- function(x, n_curves = NULL, alpha = 0.3, ...) {
     ggplot2::theme(
       legend.text = ggplot2::element_text(size = 13),
       axis.text = ggplot2::element_text(size = 13),
-      axis.title = ggplot2::element_text(size = 16),
-      plot.caption = ggplot2::element_text(size = 10, color = "gray50", hjust = 0)
+      axis.title = ggplot2::element_text(size = 16)
     )
   
   return(p)

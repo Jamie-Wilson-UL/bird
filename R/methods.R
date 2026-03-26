@@ -188,14 +188,20 @@ print.bayesian_imputation <- function(x, ...) {
 
 #' Plot method for bayesian_imputation objects
 #' @param x A bayesian_imputation object
-#' @param type Type of plot: "survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison"
+#' @param type Type of plot: "survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density"
 #' @param n_curves For survival plots: number of imputed curves to display (default: 10)
 #' @param alpha For survival plots: transparency for imputed curves (default: 0.3)
 #' @param show_original For survival plots: whether to show original Kaplan-Meier curve (default: TRUE)
 #' @param n_max Backward-compatible alias:
 #'   for `type = "survival"`, treated as `n_curves`;
 #'   for `type = "boxplots_comparison"`, maximum datasets shown.
-#' @param ... Additional arguments passed to plotting functions
+#' @param ... Additional arguments passed to plotting functions.
+#'   For `type = "completed_dataset_summary"` and `type = "density"`,
+#'   you can pass `dataset_id = <integer>` to select a specific imputed dataset
+#'   (random if omitted).
+#'   For `type = "completed_dataset_summary"`, you can also pass
+#'   `panels = c("hist", "density", "survival", "boxplot")`
+#'   (or `"auto"` for the default layout).
 #' @export
 plot.bayesian_imputation <- function(x, type = "survival", n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, ...) {
   
@@ -288,7 +294,11 @@ print.bayesian_imputation_groups <- function(x, ...) {
 #' @param n_max Backward-compatible alias:
 #'   for `type = "survival"`, treated as `n_curves`;
 #'   for `type = "boxplots_comparison"`, maximum datasets shown.
-#' @param ... Additional arguments passed to plotting functions
+#' @param ... Additional arguments passed to plotting functions.
+#'   For `type = "completed_dataset_summary"`, you can pass:
+#'   `dataset_id = <integer>` and
+#'   `panels = c("hist", "density", "survival", "boxplot")`
+#'   (or `"auto"` for the default layout).
 #' @export
 plot.bayesian_imputation_groups <- function(x, type = "survival", combine_groups = TRUE, 
                                            n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, ...) {
@@ -778,9 +788,13 @@ combine_group_datasets_safe <- function(object, dataset, format) {
         group_data <- object$group_results[[group_name]]$imputed_datasets[[i]]
         combined_data <- rbind(combined_data, group_data)
       }
+      combined_data <- format_completed_dataset_output(
+        combined_data,
+        time_col = time_col
+      )
       combined_data <- standardize_complete_column_order(
         combined_data,
-        time_col = time_col,
+        time_col = "imputed_time",
         status_col = status_col
       )
       combined_list[[i]] <- combined_data
@@ -799,9 +813,13 @@ combine_group_datasets_safe <- function(object, dataset, format) {
       group_data <- object$group_results[[group_name]]$imputed_datasets[[dataset]]
       combined_data <- rbind(combined_data, group_data)
     }
+    combined_data <- format_completed_dataset_output(
+      combined_data,
+      time_col = time_col
+    )
     combined_data <- standardize_complete_column_order(
       combined_data,
-      time_col = time_col,
+      time_col = "imputed_time",
       status_col = status_col
     )
     return(combined_data)
@@ -821,11 +839,15 @@ combine_group_datasets_safe <- function(object, dataset, format) {
     
     # Add row IDs
     combined_data$.id <- seq_len(nrow(combined_data))
+    combined_data <- format_completed_dataset_output(
+      combined_data,
+      time_col = time_col
+    )
     combined_data <- standardize_complete_column_order(
       combined_data,
-      time_col = time_col,
+      time_col = "imputed_time",
       status_col = status_col
     )
     return(combined_data)
   }
-} 
+}

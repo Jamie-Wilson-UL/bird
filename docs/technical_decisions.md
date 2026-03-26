@@ -117,6 +117,16 @@ prior <- list(
 
 These settings encourage moderate clustering and a diffuse baseline that lets the data dominate. We use a more conservative prior on the DP concentration (Gamma(10, 10), mean 1) to reduce extreme tail behavior under heavy right-censoring while keeping alpha learnable. The specific numeric values otherwise align with DPpackage examples and documentation.
 
+**Empirical justification for the `Gamma(10, 10)` default**:
+- This was chosen as a regularization change from an earlier `Gamma(10, 1)` setting.
+- In repeated sensitivity runs (real `lung` data and simulated right-censored datasets), `Gamma(10, 10)` consistently reduced posterior `alpha` and the average number of occupied clusters (`ncluster`), typically by about 70-80%.
+- In most runs this also reduced upper-tail imputation spread (e.g., 95th/99th percentiles), though not in every single random seed under very heavy censoring.
+- Therefore, we treat this as a stability-oriented default rather than a guarantee against extreme draws.
+
+**Recommended practice**:
+- Keep `Gamma(10, 10)` as the default for routine use.
+- For analyses sensitive to upper tails, run prior sensitivity checks (e.g., compare `Gamma(10, 10)` with `Gamma(10, 1)` or fixed `alpha`) and report robustness.
+
 If you want tighter control over the concentration parameter you can fix `alpha` directly:
 
 ```r
@@ -171,7 +181,8 @@ Once you have at least two successful groups, the package computes a pooled Wald
 
 Every completed dataset includes columns that let you trace back to what was originally there:
 
-- `original_time` and `original_status` preserve the values before imputation
+- `time` preserves the original observed/censoring time and `imputed_time` stores the completed event time
+- `original_status` preserves the status value before imputation
 - `was_censored` flags which observations were censored (so you can see exactly what got imputed)
 - `dataset_id` tracks which imputation each row belongs to when you generate multiple datasets
 - `.imp` provides labeling for long-format exports
@@ -189,7 +200,23 @@ The `export()` function can save completed datasets in a few common formats. Rig
 
 ---
 
-## 6. Known Limitations 
+## 6. Legacy Fortran I/O and CRAN NOTE
+
+The nonparametric LDDP implementation vendors legacy DPpackage Fortran code that uses
+Fortran file I/O (`open/read/write/rewind/close`) internally. This can trigger the
+standard CRAN compiled-code NOTE about `__gfortran_st_*` symbols.
+
+For containment, the package wrapper executes these routines inside a temporary directory
+created at runtime (`tempfile("dppackage_")`), restores the original working directory,
+and cleans temporary files on exit. This behavior is implemented in
+`LDDPsurvival.default` (`R/LDDPsurvival.R`).
+
+This design does not remove the NOTE itself, but it keeps I/O scoped to temporary
+locations and avoids persistent file side effects in normal usage.
+
+---
+
+## 7. Known Limitations 
 
 We've prioritised getting the core imputation workflow right (parametric and nonparametric, single cohort and grouped) before branching into more specialised use cases. Further development potentially includes:
 
@@ -202,4 +229,3 @@ We've prioritised getting the core imputation workflow right (parametric and non
 3. Hierarchical group models. Groups are independent at the moment. A partial-pooling model could borrow strength if you have many small groups, but that would add complexity.
 
 4. Time-varying covariates. Not supported.
-

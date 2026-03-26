@@ -23,7 +23,7 @@ Reordered data.frame
 \description{
 Reorders completed datasets so original/new censor indicators and times are
 grouped together for easier inspection:
-\code{original_status}, \code{status}, \code{was_censored}, \code{original_time}, \code{time}.
+\code{original_status}, \code{status}, \code{was_censored}, \code{time}, \code{imputed_time}.
 }
 \details{
 Metadata columns (when present) are kept at the front:

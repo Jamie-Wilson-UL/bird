@@ -1,8 +1,8 @@
 ---
-title: "bird: Bayesian Imputation for Right-censored survival Data"
+title: "bird: Bayesian Imputation for Right-censored Data"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{bird: Bayesian Imputation for Right-censored survival Data}
+  %\VignetteIndexEntry{bird: Bayesian Imputation for Right-censored Data}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -14,7 +14,7 @@ run_models <- identical(Sys.getenv("BIRD_RUN_VIGNETTE_MODELS"), "true")
 
 ## Overview
 
-`bird` provides Bayesian multiple imputation for right-censored survival data.
+`bird` provides Bayesian imputation for right-censored survival data.
 
 It supports:
 
@@ -22,6 +22,7 @@ It supports:
 - Nonparametric LDDP imputation
 - Grouped analyses
 - Multi-model comparisons
+- Export options for completed datasets
 
 Throughout this vignette we use `survival::lung`.
 
@@ -33,6 +34,23 @@ lung <- survival::lung
 head(lung[, c("time", "status", "sex", "age")])
 ```
 
+## Installation
+
+```{r eval = FALSE}
+# install.packages("devtools")
+devtools::install_github("Jamie-Wilson-UL/bird")
+
+library(bird)
+```
+
+If you plan to use parametric engines, `rstan` is used with package-precompiled Stan models.
+
+- CRAN binary installs (Windows/macOS) usually do not need local Stan compilation.
+- Source installs still need a working C++ toolchain at install time:
+  - Windows: RTools
+  - macOS: `xcode-select --install`
+  - Linux: `g++` and `make` (e.g. `build-essential`)
+
 ## One-Function Workflow
 
 For most analyses, use `impute()` directly.
@@ -42,7 +60,9 @@ set.seed(2026)
 
 fit <- impute(
   lung,
-  n_imputations = 5,
+  time = "time",
+  status = "status",
+  n_imputations = 10,
   distribution = "weibull",
   time_unit = "days",
   mcmc_options = list(iter_warmup = 200, iter_sampling = 200, chains = 2),
@@ -63,7 +83,7 @@ Time units:
 - `time_unit` controls labels/reporting and default time-horizon summaries.
 - Input times are assumed to already be in that unit (no automatic conversion).
 
-`impute()` auto-detects common time/status columns. If names are unusual, specify them:
+`impute()` can also auto-detect common time/status columns. If names are unusual, it is safer to specify them explicitly.
 
 ```{r eval = FALSE}
 fit <- impute(
@@ -75,11 +95,18 @@ fit <- impute(
 )
 ```
 
-Switching engines is just argument changes:
+Switching parametric distributions is just an argument change:
 
 ```{r eval = FALSE}
-fit_np  <- impute(lung, model = "nonparametric", n_imputations = 5)
-fit_grp <- impute(lung, groups = "sex", distribution = "weibull", n_imputations = 5)
+fit_weibull <- impute(lung, distribution = "weibull", n_imputations = 5)
+fit_exp     <- impute(lung, distribution = "exponential", n_imputations = 5)
+fit_lognorm <- impute(lung, distribution = "lognormal", n_imputations = 5)
+```
+
+For nonparametric imputation, use the Linear Dependent Dirichlet Process (LDDP) model:
+
+```{r eval = FALSE}
+fit_np <- impute(lung, model = "nonparametric", n_imputations = 5)
 ```
 
 Direct functions are also available: `bayesian_impute()` (parametric) and `bayes_np_impute()` (nonparametric).
@@ -93,10 +120,12 @@ plot(fit, type = "survival")
 plot(fit, type = "survival", n_curves = 20)
 plot(fit, type = "completed_dataset_summary")
 plot(fit, type = "completed_dataset_summary", dataset_id = 3)
+plot(fit, type = "completed_dataset_summary", panels = c("hist", "density", "boxplot"))
 plot(fit, type = "boxplots_comparison")
 plot(fit, type = "boxplots_comparison", n_max = 20)
 plot(fit, type = "boxplots_comparison", dataset_indices = c(1, 5, 10))
 plot(fit, type = "density")
+plot(fit, type = "density", dataset_id = 3)
 ```
 
 Diagnostics:
@@ -111,12 +140,24 @@ plot(fit, type = "pairs")
 
 ## Grouped Analyses
 
+Grouped analyses are fitted by setting `groups = ...`:
+
+```{r eval = FALSE}
+fit_grp <- impute(
+  lung,
+  groups = "sex",
+  distribution = "weibull",
+  n_imputations = 10
+)
+```
+
 All group-specific objects (`impute(..., groups = ...)`) use the same plotting API.
 
 ```{r eval = FALSE}
 print(fit_grp)
 plot(fit_grp, type = "survival")
 plot(fit_grp, type = "completed_dataset_summary")
+plot(fit_grp, type = "completed_dataset_summary", panels = c("survival", "boxplot", "density"))
 plot(fit_grp, type = "survival", combine_groups = FALSE)
 plot(fit_grp, type = "boxplots_comparison")
 ```
@@ -124,7 +165,8 @@ plot(fit_grp, type = "boxplots_comparison")
 For `plot(fit_grp, type = "completed_dataset_summary")`:
 
 - 2 groups: full 4-panel view (histogram, density, survival, boxplot)
-- >2 groups: simplified view (survival + boxplot)
+- For greater than 2 groups: simplified view (survival + boxplot) to avoid clutter
+- You can override defaults with e.g., `panels = c("hist", "density", "boxplot")`. Valid panel names are "hist", "density", "survival", "boxplot"
 
 ### 3-Group Example
 
@@ -152,6 +194,7 @@ print(fit_grp3)
 plot(fit_grp3, type = "survival")
 plot(fit_grp3, type = "survival", combine_groups = FALSE)
 plot(fit_grp3, type = "completed_dataset_summary")
+plot(fit_grp3, type = "completed_dataset_summary", panels = c("survival", "boxplot", "density"))
 ```
 
 ## Comparing Multiple Models
@@ -171,6 +214,10 @@ cmp <- compare_models(
 print(cmp)
 plot(cmp, type = "survival")
 plot(cmp, type = "completed_dataset_summary")
+plot(cmp, type = "completed_dataset_summary", panels = c("hist", "survival", "boxplot"))
+plot(cmp, type = "boxplots_comparison")
+plot(cmp, type = "density")
+plot(cmp, type = "density", dataset_id = 3)
 ```
 
 Accepted model values include `"weibull"`, `"exponential"`, `"lognormal"`, and `"nonparametric"` (aliases `"np"`, `"lddp"`).
@@ -179,6 +226,7 @@ For `plot(cmp, type = "completed_dataset_summary")`:
 
 - 2 models: full 4-panel view (histogram, density, survival, boxplot)
 - >2 models: simplified view (survival + boxplot)
+- You can override defaults with `panels = c(...)`.
 
 ## Working with Completed Datasets
 
@@ -188,7 +236,8 @@ all_sets <- complete(fit)
 long_fmt <- complete(fit, format = "long")
 ```
 
-Each completed dataset includes transparency columns (`original_time`, `original_status`, `was_censored`).
+Each completed dataset includes transparency columns (`time`, `imputed_time`, `original_status`, `was_censored`).
+Here, `time` is the original observed/censoring time and `imputed_time` is the completed event time.
 
 For grouped analyses:
 
@@ -248,8 +297,8 @@ Nonparametric runs accept `mcmc = list(nburn = ..., nsave = ..., nskip = ...)` i
 - Columns not found: inspect `colnames(data)` and specify `time`/`status` explicitly.
 - Stan compilation errors: confirm C++ toolchain setup.
 - MCMC diagnostics: inspect `plot(fit, type = "trace")`, then increase iterations if needed.
-- Performance: reduce imputations or use a faster distribution (`"exponential"`).
-- Reusing draws: use `generate_complete_datasets()` on stored draws instead of refitting.
+- Performance: use fewer imputations or a faster distribution (`"exponential"`).
+- Reusing draws: use `generate_complete_datasets()` instead of refitting.
 
 Quick data sanity check:
 
@@ -265,7 +314,7 @@ stopifnot(
 ## Summary
 
 - `impute()` is the default entry point.
-- Parametric vs nonparametric vs grouped behavior is controlled by `distribution`, `model`, and `groups`.
+- Parametric/nonparametric/grouped behavior is controlled by `distribution`, `model`, and `groups`.
 - Use `complete()` and `export()` after fitting.
 - Plots provide quality checks and diagnostics.
-- Custom priors/MCMC settings are available if needed.
+- Custom priors and MCMC controls are available when needed.

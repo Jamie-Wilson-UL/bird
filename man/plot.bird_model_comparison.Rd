@@ -4,14 +4,27 @@
 \alias{plot.bird_model_comparison}
 \title{Plot method for model comparison objects}
 \usage{
-\method{plot}{bird_model_comparison}(x, type = c("survival", "completed_dataset_summary"), ...)
+\method{plot}{bird_model_comparison}(
+  x,
+  type = c("survival", "completed_dataset_summary", "boxplots_comparison", "density"),
+  ...
+)
 }
 \arguments{
 \item{x}{A \code{bird_model_comparison} object.}
 
-\item{type}{Plot type: \code{"survival"} or \code{"completed_dataset_summary"}.}
+\item{type}{Plot type:
+\code{"survival"}, \code{"completed_dataset_summary"}, \code{"boxplots_comparison"}, or \code{"density"}.}
 
-\item{...}{Additional arguments passed to plotting helpers.}
+\item{...}{Additional arguments passed to plotting helpers.
+For \code{type = "completed_dataset_summary"}, you can pass:
+\verb{dataset_id = <integer>} and
+\code{panels = c("hist", "density", "survival", "boxplot")}
+(or \code{"auto"} for the default layout).
+For \code{type = "boxplots_comparison"}, you can pass:
+\verb{n_max = <integer>} and/or \code{dataset_indices = c(...)}.
+For \code{type = "density"}, you can pass:
+\verb{dataset_id = <integer>} (random if omitted).}
 }
 \description{
 Plot method for model comparison objects

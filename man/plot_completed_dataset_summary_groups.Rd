@@ -7,6 +7,7 @@
 plot_completed_dataset_summary_groups(
   x,
   dataset_id = NULL,
+  panels = "auto",
   alpha = 0.6,
   group_colors = NULL,
   ...
@@ -16,6 +17,10 @@ plot_completed_dataset_summary_groups(
 \item{x}{bayesian_imputation_groups object}
 
 \item{dataset_id}{Dataset ID to plot (NULL for random)}
+
+\item{panels}{Which panels to display. Use \code{"auto"} for default behaviour
+(full 4-panel for <=2 groups; survival+boxplot for >2 groups),
+or any combination of \code{c("hist", "density", "survival", "boxplot")}.}
 
 \item{alpha}{Transparency for overlapping plots}
 

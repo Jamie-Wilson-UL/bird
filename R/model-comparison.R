@@ -229,6 +229,8 @@ print.bird_model_comparison <- function(x, ...) {
   cat("----------\n")
   cat("- plot(result)  # Survival comparison across models\n")
   cat("- plot(result, type = 'completed_dataset_summary')\n")
+  cat("- plot(result, type = 'boxplots_comparison')\n")
+  cat("- plot(result, type = 'density')\n")
   cat("- complete(result, models = 'combined', dataset = 1)\n")
   cat("\n")
 
@@ -237,10 +239,19 @@ print.bird_model_comparison <- function(x, ...) {
 
 #' Plot method for model comparison objects
 #' @param x A `bird_model_comparison` object.
-#' @param type Plot type: `"survival"` or `"completed_dataset_summary"`.
+#' @param type Plot type:
+#'   `"survival"`, `"completed_dataset_summary"`, `"boxplots_comparison"`, or `"density"`.
 #' @param ... Additional arguments passed to plotting helpers.
+#'   For `type = "completed_dataset_summary"`, you can pass:
+#'   `dataset_id = <integer>` and
+#'   `panels = c("hist", "density", "survival", "boxplot")`
+#'   (or `"auto"` for the default layout).
+#'   For `type = "boxplots_comparison"`, you can pass:
+#'   `n_max = <integer>` and/or `dataset_indices = c(...)`.
+#'   For `type = "density"`, you can pass:
+#'   `dataset_id = <integer>` (random if omitted).
 #' @export
-plot.bird_model_comparison <- function(x, type = c("survival", "completed_dataset_summary"), ...) {
+plot.bird_model_comparison <- function(x, type = c("survival", "completed_dataset_summary", "boxplots_comparison", "density"), ...) {
   type <- match.arg(type)
 
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
@@ -251,6 +262,8 @@ plot.bird_model_comparison <- function(x, type = c("survival", "completed_datase
     type,
     "survival" = plot_survival_curves_models(x, ...),
     "completed_dataset_summary" = plot_completed_dataset_summary_models(x, ...),
+    "boxplots_comparison" = plot_boxplots_comparison_models(x, ...),
+    "density" = plot_density_comparison_models(x, ...),
     stop("Unknown plot type: ", type)
   )
 }
@@ -352,9 +365,13 @@ combine_model_datasets_safe <- function(object, dataset = NULL, format = c("wide
       d[, all_cols, drop = FALSE]
     })
     out <- do.call(rbind, aligned)
+    out <- format_completed_dataset_output(
+      out,
+      time_col = time_col
+    )
     standardize_complete_column_order(
       out,
-      time_col = time_col,
+      time_col = "imputed_time",
       status_col = status_col
     )
   }
@@ -363,7 +380,7 @@ combine_model_datasets_safe <- function(object, dataset = NULL, format = c("wide
     long_data <- do.call(rbind, lapply(dataset_idx, combine_one))
     return(standardize_complete_column_order(
       long_data,
-      time_col = time_col,
+      time_col = "imputed_time",
       status_col = status_col
     ))
   }

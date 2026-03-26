@@ -2,14 +2,17 @@
 % Please edit documentation in R/plotting-helpers.R
 \name{plot_completed_dataset_summary}
 \alias{plot_completed_dataset_summary}
-\title{Plot completed dataset summary (4-panel plot)}
+\title{Plot completed dataset summary panels}
 \usage{
-plot_completed_dataset_summary(x, dataset_id = NULL, ...)
+plot_completed_dataset_summary(x, dataset_id = NULL, panels = "auto", ...)
 }
 \arguments{
 \item{x}{bayesian_imputation object}
 
 \item{dataset_id}{Specific dataset to plot (NULL for random)}
+
+\item{panels}{Which panels to display. Use \code{"auto"} for default 4-panel layout,
+or any combination of \code{c("hist", "density", "survival", "boxplot")}.}
 
 \item{...}{Additional arguments}
 }
@@ -17,6 +20,6 @@ plot_completed_dataset_summary(x, dataset_id = NULL, ...)
 ggplot object
 }
 \description{
-Plot completed dataset summary (4-panel plot)
+Plot completed dataset summary panels
 }
 \keyword{internal}

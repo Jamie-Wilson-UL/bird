@@ -1,53 +1,45 @@
 # bird User Guide
 
----
+## Overview
 
-## Getting Started
+`bird` provides Bayesian imputation for right-censored survival data.
 
-Install from GitHub and load the library:
+It supports:
+- Parametric models (`weibull`, `exponential`, `lognormal`) via Stan
+- Nonparametric LDDP imputation
+- Grouped analyses
+- Multi-model comparisons
+- Export options for completed datasets
+
+## Installation
 
 ```r
-install.packages("devtools")
+# install.packages("devtools")
 devtools::install_github("Jamie-Wilson-UL/bird")
 
 library(bird)
 ```
 
-If you plan to use the parametric engines (Weibull, exponential, lognormal), `rstan` is used with precompiled package models.
+If you plan to use parametric engines, `rstan` is used with package-precompiled Stan models.
 
-- **CRAN binary installs (Windows/macOS)** usually do not need local Stan compilation.
-- **Source installs** still need a working C++ toolchain at install time:
-  - **Windows**: Install RTools (includes C++ compiler)
-  - **macOS**: Install Xcode Command Line Tools: `xcode-select --install`
-  - **Linux**: Install `g++` and `make` (e.g. `sudo apt-get install build-essential`)
+- CRAN binary installs (Windows/macOS) usually do not need local Stan compilation.
+- Source installs still need a working C++ toolchain at install time:
+  - Windows: RTools
+  - macOS: `xcode-select --install`
+  - Linux: `g++` and `make` (e.g. `build-essential`)
 
-Recommended runtime settings:
-
-```r
-rstan::rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
-```
-
-The nonparametric LDDP engine doesn't rely on Stan, so it will work even if you skip the toolchain setup.
-
-Throughout the examples below, we use the classic `survival::lung` dataset:
+## One-Function Workflow
 
 ```r
 library(survival)
 lung <- survival::lung
-```
 
----
-
-## One-Function Workflow
-
-For most situations, you can just use `impute()`:
-
-```r
 fit <- impute(
   lung,
-  n_imputations = 5,
-  distribution = "weibull",    # choose "weibull", "exponential", or "lognormal"
+  time = "time",
+  status = "status",
+  n_imputations = 10,
+  distribution = "weibull",
   time_unit = "days"
 )
 ```
@@ -55,75 +47,83 @@ fit <- impute(
 Time units:
 - `time_unit` defaults to `"days"` if omitted.
 - `time_unit` controls labels/reporting and default time-horizon summaries.
-- The input `time` values are assumed to already be in that unit (no automatic conversion is performed).
+- Input `time` values are assumed to already be in that unit (no automatic conversion).
 
-By default, `impute()` tries to detect the time and status columns (looking for common names like `time`, `status`, `duration`, etc.). If your column names are unusual it is advisable to specify them explicitly:
+`impute()` can also auto-detect common time/status columns. If names are unusual, it is safer to specify them explicitly.
 
-```r
-fit <- impute(
-  lung,
-  time = "time",           # you can also pass indices, e.g. time = 3
-  status = "status",
-  n_imputations = 5,
-  distribution = "lognormal"
-)
-```
-
-Switching engines (distributions/groups) is just a change of arguments:
+Switching parametric distributions is just an argument change:
 
 ```r
-fit_np  <- impute(lung, model = "nonparametric", n_imputations = 5)
-fit_grp <- impute(lung, groups = "sex", distribution = "weibull", n_imputations = 5)
+fit_weibull <- impute(lung, distribution = "weibull", n_imputations = 5)
+fit_exp     <- impute(lung, distribution = "exponential", n_imputations = 5)
+fit_lognorm <- impute(lung, distribution = "lognormal", n_imputations = 5)
 ```
 
-If you need direct access to the underlying functions, they are available as `bayesian_impute()` (parametric) and `bayes_np_impute()` (nonparametric). They behave exactly the same as `impute()` once you pass columns or `prepare_survival_data(...)` output.
+For nonparametric imputation, use the Linear Dependent Dirichlet Process (LDDP) model:
 
----
+```r
+fit_np <- impute(lung, model = "nonparametric", n_imputations = 5)
+```
 
-## Looking at the Results
+Direct functions are also available: `bayesian_impute()` (parametric) and `bayes_np_impute()` (nonparametric).
 
-The print method gives a basic statistical summary with sensible next steps:
+## Looking at Results
 
 ```r
 print(fit)
 ```
 
-You can check your imputations with the plotting helpers:
+Plot helpers:
 
 ```r
-plot(fit, type = "survival")                  # observed vs imputed survival curves
-plot(fit, type = "survival", n_curves = 20)  # show more imputed survival curves
-plot(fit, type = "completed_dataset_summary") # overview of one random completed dataset
-plot(fit, type = "completed_dataset_summary", dataset_id = 3)  # pick a specific dataset
-plot(fit, type = "boxplots_comparison")       # compares up to 10 random datasets by default
-plot(fit, type = "boxplots_comparison", n_max = 20)            # increase the displayed limit
-plot(fit, type = "boxplots_comparison", dataset_indices = c(1, 5, 10)) # choose exact datasets
-plot(fit, type = "density")                   # mean imputed density + pointwise 95% band
+plot(fit, type = "survival")
+plot(fit, type = "survival", n_curves = 20)
+plot(fit, type = "completed_dataset_summary")
+plot(fit, type = "completed_dataset_summary", dataset_id = 3)
+plot(fit, type = "completed_dataset_summary", dataset_id = 3, panels = c("hist", "density", "boxplot"))
+plot(fit, type = "boxplots_comparison")
+plot(fit, type = "boxplots_comparison", n_max = 20)
+plot(fit, type = "boxplots_comparison", dataset_indices = c(1, 5, 10))
+plot(fit, type = "density")                           # one random imputed dataset
+plot(fit, type = "density", dataset_id = 3)           # choose a specific imputed dataset
 ```
 
-When you want to dive deeper into model diagnostics, these are available too:
+Diagnostics:
 
 ```r
-plot(fit, type = "posterior")  # (random) posterior distributions
-plot(fit, type = "trace")      # MCMC convergence (requires bayesplot package)
-plot(fit, type = "pairs")      # parameter relationships (requires bayesplot package)
+plot(fit, type = "posterior")
+plot(fit, type = "trace")
+plot(fit, type = "pairs")
 ```
 
-Note: The `trace` and `pairs` plot types rely on the `bayesplot` package. If you see a message asking you to install it, run `install.packages(c("bayesplot", "posterior"))` and the plots will work.
+The `trace`/`pairs` plots require `bayesplot` (and `posterior`).
 
-All of the group-specific objects (`impute(..., groups = ...)`) respond to the same plotting API. For example:
+Grouped analyses are fitted by setting `groups = ...`:
+
+```r
+fit_grp <- impute(
+  lung,
+  groups = "sex",
+  distribution = "weibull",
+  n_imputations = 10
+)
+```
+
+Grouped fits use the same plotting API:
 
 ```r
 print(fit_grp)
 plot(fit_grp, type = "survival")
-plot(fit_grp, type = "completed_dataset_summary") 
-plot(fit_grp, type = "survival", combine_groups = FALSE)  # separate panel per group
+plot(fit_grp, type = "completed_dataset_summary")
+plot(fit_grp, type = "completed_dataset_summary", panels = c("survival", "boxplot", "density"))
+plot(fit_grp, type = "survival", combine_groups = FALSE)
 plot(fit_grp, type = "boxplots_comparison")
 ```
 
 For `plot(fit_grp, type = "completed_dataset_summary")`:
-- 2 groups: full 4-panel view (histogram, density, survival, boxplot),
-- >2 groups: simplified view (survival + boxplot).
+- 2 groups: full 4-panel view (histogram, density, survival, boxplot)
+- For greater than 2 groups: simplified view (survival + boxplot) to avoid clutter
+- You can override defaults with e.g., `panels = c("hist", "density", "boxplot")`. Valid panel names are "hist", "density", "survival", "boxplot"
 
 ### 3-Group Example
 
@@ -147,14 +147,11 @@ fit_grp3 <- impute(
 print(fit_grp3)
 plot(fit_grp3, type = "survival")
 plot(fit_grp3, type = "survival", combine_groups = FALSE)
-plot(fit_grp3, type = "completed_dataset_summary")  # simplified (survival + boxplot) for >2 groups
+plot(fit_grp3, type = "completed_dataset_summary")
+plot(fit_grp3, type = "completed_dataset_summary", panels = c("survival", "boxplot", "density"))
 ```
 
----
-
 ## Comparing Multiple Models
-
-If you want to compare parametric and nonparametric imputations directly, use `compare_models()`:
 
 ```r
 cmp <- compare_models(
@@ -162,90 +159,66 @@ cmp <- compare_models(
   models = c("weibull", "nonparametric"),
   n_imputations = 5
 )
-```
 
-You can then use a comparison-oriented print/plot workflow:
-
-```r
 print(cmp)
 plot(cmp, type = "survival")
 plot(cmp, type = "completed_dataset_summary")
+plot(cmp, type = "completed_dataset_summary", panels = c("hist", "survival", "boxplot"))
+plot(cmp, type = "boxplots_comparison")
+plot(cmp, type = "density")                 
+plot(cmp, type = "density", dataset_id = 3) 
 ```
 
-`models` can include any combination of:
+Accepted `models` values include:
 - `"weibull"`
 - `"exponential"`
 - `"lognormal"`
-- `"nonparametric"` (also accepts aliases `"np"`, `"lddp"`)
+- `"nonparametric"` (aliases `"np"`, `"lddp"`)
 
-Completed datasets are available in combined or model-specific form:
+Completed datasets can be extracted combined or per model:
 
 ```r
-# Stack all selected models into one dataset (adds .model)
 combined <- complete(cmp, dataset = 1, models = "combined")
-
-# Return one object per model
 separate <- complete(cmp, dataset = 1, models = "separate")
-
-# Extract only one model from the comparison
 weibull_only <- complete(cmp, dataset = 1, models = "weibull")
 ```
 
-For `plot(cmp, type = "completed_dataset_summary")`:
-- 2 models: full 4-panel view (histogram, density, survival, boxplot),
-- >2 models: simplified view (survival + boxplot) to avoid overcrowded plots.
-
----
-
 ## Working with Completed Datasets
 
-The package stores completed datasets in a way that is deliberately transparent. You can pull out one dataset or many, in either wide, long or list form:
-
 ```r
-complete(fit, dataset = 1)            # a single completed dataset
-all_sets <- complete(fit)             # list of datasets
+complete(fit, dataset = 1)
+all_sets <- complete(fit)
 long_fmt <- complete(fit, format = "long")
 ```
 
-Each dataset carries the original time/status columns alongside the imputed versions (`original_time`, `original_status`, `was_censored`), making it easy to see exactly what changed.
+Each completed dataset includes transparency columns (`time`, `imputed_time`, `original_status`, `was_censored`), where `time` is the original observed/censoring time and `imputed_time` is the completed event time.
 
-For grouped analyses you can choose to combine groups or keep them separate:
+For grouped analyses:
 
 ```r
 combined <- complete(fit_grp, dataset = 1, groups = "combined")
 separate <- complete(fit_grp, dataset = 1, groups = "separate")
 ```
 
----
-
 ## Exporting
-
-When you are satisfied with a fit, export the data in the format that suits your downstream work:
 
 ```r
 export(fit, "weibull_results", format = "csv")
 export(fit, "weibull_results", format = "rds")
 ```
 
-There are helper arguments if you want to drop the transparency columns or focus on particular datasets:
-
 ```r
 export(fit, "clean_results", format = "csv", include_original = FALSE)
 export(fit_grp, "groups", format = "csv", groups = "separate")
 ```
 
-At the moment only CSV and RDS exports are enabled in the package. (Support for Excel/Stata/SPSS is planned, but not yet implemented.)
+Current export formats are CSV and RDS.
 
 When exporting multiple datasets to RDS, set `combine = FALSE` to write one file per dataset.
 
----
-
 ## Advanced Usage
 
-The defaults should be sufficient for most applications, but it is also possible to specify custom priors and MCMC settings. A good pattern is to start from the defaults and tweak the pieces you care about:
-
 ```r
-# Start from the default Weibull priors and modify them
 my_priors <- get_default_priors("weibull")
 my_priors$mu_log_shape <- 0.2
 my_priors$sd_log_shape <- 0.4
@@ -270,21 +243,18 @@ custom_fit <- impute(
 )
 ```
 
-You can do the same for other distributions (`get_default_priors("lognormal")`, etc.). Nonparametric runs accept `mcmc = list(nburn = ..., nsave = ..., nskip = ...)` in the same way.
-
----
+You can do the same for other distributions (`get_default_priors("lognormal")`, etc.).
+Nonparametric runs accept `mcmc = list(nburn = ..., nsave = ..., nskip = ...)` in the same way.
 
 ## Troubleshooting
 
-A few quick checks:
+- Columns not found: inspect `colnames(data)` and specify `time`/`status` explicitly.
+- Stan compilation errors: confirm C++ toolchain setup.
+- MCMC diagnostics: inspect `plot(fit, type = "trace")`, then increase iterations if needed.
+- Performance: use fewer imputations or a faster distribution (`"exponential"`).
+- Reusing draws: use `generate_complete_datasets()` instead of refitting.
 
-- **Columns not found**: inspect with `colnames(lung)` and specify `time = "..."`, `status = "..."` explicitly (indices work too).
-- **Stan compilation errors**: confirm your C++ toolchain is installed (RTools / Xcode CLT / build-essential).
-- **MCMC diagnostics**: call `plot(fit, type = "trace")` to inspect convergence; increase iterations if needed.
-- **Performance**: use fewer imputations (e.g., 5 instead of 50) or choose a faster distribution (`"exponential"`).
-- **Reusing draws**: if you want 100 datasets but already ran 20, use `generate_complete_datasets()` on the stored posterior draws rather than refitting.
-
-A quick sanity check to confirm your data meet the minimum requirements:
+Quick data sanity check:
 
 ```r
 stopifnot(
@@ -295,12 +265,10 @@ stopifnot(
 )
 ```
 
----
-
 ## Summary
 
 - `impute()` is the default entry point.
-- Parametric vs nonparametric vs grouped behaviour is controlled with `distribution`, `model`, and `groups` arguments.
-- `complete()` and `export()` once you have a fit.
+- Parametric/nonparametric/grouped behavior is controlled by `distribution`, `model`, and `groups`.
+- Use `complete()` and `export()` after fitting.
 - Plots provide quality checks and diagnostics.
-- Custom priors/MCMC settings are available if desired.
+- Custom priors and MCMC controls are available when needed.

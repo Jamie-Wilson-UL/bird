@@ -218,7 +218,11 @@ export_group_imputed_data <- function(object, file_path, format, datasets, group
 #' Remove Original Value Columns
 #' @keywords internal
 remove_original_columns <- function(data) {
-  cols_to_remove <- c("original_time", "original_status", "was_censored")
+  cols_to_remove <- if ("imputed_time" %in% names(data)) {
+    c("time", "original_time", "original_status", "was_censored")
+  } else {
+    c("original_time", "original_status", "was_censored")
+  }
   cols_to_remove <- cols_to_remove[cols_to_remove %in% names(data)]
   if (length(cols_to_remove) > 0) {
     data <- data[, !names(data) %in% cols_to_remove, drop = FALSE]

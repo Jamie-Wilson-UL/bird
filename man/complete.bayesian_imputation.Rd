@@ -48,9 +48,9 @@ additional processing.
 \details{
 The completed datasets contain the following columns:
 \itemize{
-\item \code{time}: Imputed survival time (or original time if was an event)
+\item \code{time}: Original observed/censoring time from input data
+\item \code{imputed_time}: Imputed survival time (or original time if was an event)
 \item \code{status}: Always 1 (all observations are events in completed datasets)
-\item \code{original_time}: Original time value (censoring time for censored observations)
 \item \code{original_status}: Original status (0 = censored, 1 = event)
 \item \code{was_censored}: Logical flag indicating originally censored observations
 \item \code{dataset_id}: Dataset identifier (in wide format)

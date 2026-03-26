@@ -32,7 +32,11 @@
 for \code{type = "survival"}, treated as \code{n_curves};
 for \code{type = "boxplots_comparison"}, maximum datasets shown.}
 
-\item{...}{Additional arguments passed to plotting functions}
+\item{...}{Additional arguments passed to plotting functions.
+For \code{type = "completed_dataset_summary"}, you can pass:
+\verb{dataset_id = <integer>} and
+\code{panels = c("hist", "density", "survival", "boxplot")}
+(or \code{"auto"} for the default layout).}
 }
 \description{
 Plot method for bayesian_imputation_groups objects

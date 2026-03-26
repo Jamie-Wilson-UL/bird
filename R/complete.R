@@ -46,9 +46,9 @@ complete <- function(object, ...) {
 #' @details
 #' The completed datasets contain the following columns:
 #' \itemize{
-#'   \item \code{time}: Imputed survival time (or original time if was an event)
+#'   \item \code{time}: Original observed/censoring time from input data
+#'   \item \code{imputed_time}: Imputed survival time (or original time if was an event)
 #'   \item \code{status}: Always 1 (all observations are events in completed datasets)
-#'   \item \code{original_time}: Original time value (censoring time for censored observations)
 #'   \item \code{original_status}: Original status (0 = censored, 1 = event)
 #'   \item \code{was_censored}: Logical flag indicating originally censored observations
 #'   \item \code{dataset_id}: Dataset identifier (in wide format)
@@ -131,9 +131,12 @@ complete.bayesian_imputation <- function(object,
   
   # Add original data if requested
   if (include.original) {
-    original_with_id <- object$original_data
+    original_with_id <- strip_survival_data_metadata(object$original_data)
     original_with_id$.imp <- 0
     original_with_id$.id <- seq_len(nrow(original_with_id))
+    original_with_id$original_time <- original_with_id[[time_col]]
+    original_with_id$original_status <- original_with_id[[status_col]]
+    original_with_id$was_censored <- original_with_id[[status_col]] == 0
     
     # Ensure original data has same columns as imputed datasets
     if (length(selected_datasets) > 0) {
@@ -159,6 +162,14 @@ complete.bayesian_imputation <- function(object,
     selected_datasets <- c(list(original_with_id), selected_datasets)
     dataset_numbers <- c(0, dataset_numbers)
   }
+
+  # Standardize user-facing output:
+  # - drop survival_data class/attrs
+  # - rename internal time columns to `time` (original) + `imputed_time`
+  selected_datasets <- lapply(selected_datasets, function(d) {
+    format_completed_dataset_output(d, time_col = time_col)
+  })
+  output_time_col <- "imputed_time"
   
   # Handle different output formats
   if (format == "long") {
@@ -177,7 +188,7 @@ complete.bayesian_imputation <- function(object,
     # Reorder columns to put .imp and .id first
     long_data <- standardize_complete_column_order(
       long_data,
-      time_col = time_col,
+      time_col = output_time_col,
       status_col = status_col
     )
     
@@ -193,7 +204,7 @@ complete.bayesian_imputation <- function(object,
       }
       selected_datasets[[i]] <- standardize_complete_column_order(
         selected_datasets[[i]],
-        time_col = time_col,
+        time_col = output_time_col,
         status_col = status_col
       )
     }

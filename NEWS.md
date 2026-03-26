@@ -1,3 +1,5 @@
-# bird (development version)
+# bird 0.1.0.9000
 
-No official release yet. This file will be populated once the first testing build is finalised. 
+## Development
+
+* Ongoing pre-release development and CRAN-readiness refinements.

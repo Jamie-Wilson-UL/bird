@@ -4,14 +4,22 @@
 \alias{plot_density_comparison}
 \title{Plot density comparison using logspline}
 \usage{
-plot_density_comparison(x, n_curves = NULL, alpha = 0.3, ...)
+plot_density_comparison(
+  x,
+  dataset_id = NULL,
+  n_curves = NULL,
+  alpha = 0.3,
+  ...
+)
 }
 \arguments{
 \item{x}{bayesian_imputation object}
 
-\item{n_curves}{Number of imputed curves to show (NULL for all)}
+\item{dataset_id}{Dataset index to use for the imputed density curve (NULL for random)}
 
-\item{alpha}{Transparency for imputed curves}
+\item{n_curves}{Deprecated and ignored (kept for backward compatibility)}
+
+\item{alpha}{Deprecated and ignored (kept for backward compatibility)}
 
 \item{...}{Additional arguments}
 }

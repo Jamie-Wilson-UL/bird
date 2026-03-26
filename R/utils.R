@@ -46,7 +46,7 @@ format_time <- function(time_seconds) {
 #'
 #' Reorders completed datasets so original/new censor indicators and times are
 #' grouped together for easier inspection:
-#' `original_status`, `status`, `was_censored`, `original_time`, `time`.
+#' `original_status`, `status`, `was_censored`, `time`, `imputed_time`.
 #'
 #' Metadata columns (when present) are kept at the front:
 #' `.imp`, `.id`, `.model`, `dataset_id`.
@@ -64,7 +64,11 @@ standardize_complete_column_order <- function(data, time_col = "time", status_co
   cols <- names(data)
 
   meta_set <- c(".imp", ".id", ".model", "dataset_id")
-  compare_block <- c("original_status", status_col, "was_censored", "original_time", time_col)
+  compare_block <- c(
+    "original_status", status_col, "was_censored",
+    "time", "imputed_time",
+    "original_time", time_col
+  )
 
   # Always place metadata at the front in a consistent order.
   ordered_front <- intersect(c(".imp", ".id", ".model", "dataset_id"), cols)
@@ -74,6 +78,60 @@ standardize_complete_column_order <- function(data, time_col = "time", status_co
   rest <- setdiff(cols, ordered)
 
   data[, c(ordered, rest), drop = FALSE]
+}
+
+#' Drop survival_data metadata/class from completed dataset outputs
+#' @param data Completed dataset
+#' @return Plain data.frame without survival_data attributes
+#' @keywords internal
+strip_survival_data_metadata <- function(data) {
+  if (!is.data.frame(data)) {
+    return(data)
+  }
+
+  out <- as.data.frame(data, stringsAsFactors = FALSE)
+  cls <- class(out)
+  if ("survival_data" %in% cls) {
+    cls <- setdiff(cls, "survival_data")
+    class(out) <- if (length(cls) > 0) cls else "data.frame"
+  }
+
+  for (nm in c("time_col", "status_col", "n_total", "n_censored", "censoring_rate", "time_unit")) {
+    attr(out, nm) <- NULL
+  }
+
+  out
+}
+
+#' Format completed dataset output columns for user-facing complete()
+#' @param data Completed dataset
+#' @param time_col Name of imputed/current time column in internal objects
+#' @return Completed dataset with standardized time columns
+#' @keywords internal
+format_completed_dataset_output <- function(data, time_col = "time") {
+  if (!is.data.frame(data) || ncol(data) == 0) {
+    return(data)
+  }
+
+  out <- strip_survival_data_metadata(data)
+  cols <- names(out)
+
+  if (time_col %in% cols && time_col != "imputed_time") {
+    names(out)[cols == time_col] <- "imputed_time"
+    cols <- names(out)
+  }
+
+  if ("original_time" %in% cols) {
+    names(out)[cols == "original_time"] <- "time"
+    cols <- names(out)
+  }
+
+  # Fallback for legacy/mock datasets that do not carry `original_time`
+  if (!("time" %in% cols) && "imputed_time" %in% cols) {
+    out$time <- out$imputed_time
+  }
+
+  out
 }
 
 #' Safe evaluation with error handling

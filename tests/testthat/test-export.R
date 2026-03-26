@@ -27,7 +27,7 @@ test_that("parametric export saves expected CSVs (all and first)", {
   for (p in paths_all) {
     expect_true(file.exists(p))
     dat <- utils::read.csv(p, stringsAsFactors = FALSE)
-    expect_true(all(c("time", "status", "original_time", "original_status", "was_censored", ".imp") %in% names(dat)))
+    expect_true(all(c("time", "imputed_time", "status", "original_status", "was_censored", ".imp") %in% names(dat)))
     expect_equal(nrow(dat), nrow(res$original_data))
   }
 
@@ -36,7 +36,7 @@ test_that("parametric export saves expected CSVs (all and first)", {
   expect_length(path_first, 1)
   expect_true(file.exists(path_first))
   dat1 <- utils::read.csv(path_first, stringsAsFactors = FALSE)
-  expect_true(all(c("time", "status", "original_time", "original_status", "was_censored") %in% names(dat1)))
+  expect_true(all(c("time", "imputed_time", "status", "original_status", "was_censored") %in% names(dat1)))
   expect_equal(nrow(dat1), nrow(res$original_data))
 })
 
@@ -90,7 +90,6 @@ test_that("nonparametric export saves expected CSV (first)", {
   expect_length(path_first, 1)
   expect_true(file.exists(path_first))
   dat <- utils::read.csv(path_first, stringsAsFactors = FALSE)
-  expect_true(all(c("time", "status", "original_time", "original_status", "was_censored") %in% names(dat)))
+  expect_true(all(c("time", "imputed_time", "status", "original_status", "was_censored") %in% names(dat)))
   expect_equal(nrow(dat), nrow(res_np$original_data))
 })
-
