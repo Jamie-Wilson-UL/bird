@@ -74,7 +74,7 @@ print.bayesian_imputation <- function(x, ...) {
     imp_ci_high <- format_survival_time(clinical_metrics$imputed$median_summary["q975"], x = x)
     
     cat("Median Survival:\n")
-    cat("  Original (observed):", orig_median, "\n")
+    cat("  Observed (KM):      ", orig_median, "\n")
     cat("  After imputation:   ", imp_median, "\n")
     cat("  95% CI:            [", imp_ci_low, "-", imp_ci_high, "]\n")
     
@@ -118,8 +118,7 @@ print.bayesian_imputation <- function(x, ...) {
       
       cat("Original censoring (median):", orig_med, "\n")
       cat("Imputed times (median):     ", imp_med, "\n")
-      cat("Median extension beyond censoring:", gain_med, 
-          " (imputed ", imp_med, " vs censoring ", orig_med, ")\n", sep = "")
+      cat("Median extension beyond censoring:", gain_med, "\n")
       
       # Quality indicator
       if (imputation_summary$all_gains_positive) {
@@ -167,46 +166,47 @@ print.bayesian_imputation <- function(x, ...) {
   }
   cat("\n")
   
-  # Next steps shown only when not suppressed
-  if (!isTRUE(attr(x, "suppress_next_steps"))) {
-    cat("NEXT STEPS\n")
-    cat("----------\n")
-    cat("- plot(result)                    # View survival curves\n")
-    cat("- complete(result, dataset = 1)   # Extract completed dataset\n")
-    if (x$model_info$n_imputations <= 10) {
-      cat("- plot(result, type = 'boxplots_comparison')  # Compare datasets\n")
-      cat("- plot(result, type = 'density')              # Density comparison\n")
-    } else {
-      cat("- plot(result, type = 'boxplots_comparison')  # Compare first 10 datasets (", x$model_info$n_imputations, " total)\n", sep = "")
-      cat("- plot(result, type = 'density')              # Density comparison\n")
-    }
-    cat("\n")
-  }
-  
   invisible(x)
 }
 
 #' Plot method for bayesian_imputation objects
 #' @param x A bayesian_imputation object
-#' @param type Type of plot: "survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density"
+#' @param type Type of plot: "survival", "histogram"
+#'   (alias "hist"), "boxplot" (alias "box"), "trace", "pairs", "posterior",
+#'   "completed_dataset_summary", "boxplots_comparison", "density"
 #' @param n_curves For survival plots: number of imputed curves to display (default: 10)
 #' @param alpha For survival plots: transparency for imputed curves (default: 0.3)
 #' @param show_original For survival plots: whether to show original Kaplan-Meier curve (default: TRUE)
 #' @param n_max Backward-compatible alias:
 #'   for `type = "survival"`, treated as `n_curves`;
 #'   for `type = "boxplots_comparison"`, maximum datasets shown.
+#' @param color Optional single-color override for the active plot.
+#'   This is a simple alternative to `palette` when you just want one color.
+#' @param palette Optional named color overrides for single-model plots.
+#'   Supported names include:
+#'   `"km"`, `"imputed"`, `"hist_fill"`, `"density_line"`,
+#'   `"density_fill"`, `"survival_curve"`, `"box_fill"`, `"boxplots_fill"`.
 #' @param ... Additional arguments passed to plotting functions.
-#'   For `type = "completed_dataset_summary"` and `type = "density"`,
-#'   you can pass `dataset_id = <integer>` to select a specific imputed dataset
-#'   (random if omitted).
+#'   For `type = "survival"`, `type = "completed_dataset_summary"`,
+#'   `type = "histogram"`/`"hist"`, `type = "boxplot"`/`"box"`,
+#'   `type = "density"`, and `type = "boxplots_comparison"`,
+#'   you can pass `dataset_id = <integer>` or `dataset_id = c(...)`
+#'   to select one or more specific imputed datasets (random if omitted).
 #'   For `type = "completed_dataset_summary"`, you can also pass
 #'   `panels = c("hist", "density", "survival", "boxplot")`
 #'   (or `"auto"` for the default layout).
 #' @export
-plot.bayesian_imputation <- function(x, type = "survival", n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, ...) {
+plot.bayesian_imputation <- function(x, type = "survival", n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, color = NULL, palette = NULL, ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
+  }
+
+  if (identical(type, "hist")) {
+    type <- "histogram"
+  }
+  if (identical(type, "box")) {
+    type <- "boxplot"
   }
 
   if (!is.null(n_max) && type == "survival") {
@@ -214,14 +214,16 @@ plot.bayesian_imputation <- function(x, type = "survival", n_curves = 10, alpha 
   }
   
   switch(type,
-    "survival" = plot_survival_curves(x, n_curves = n_curves, alpha = alpha, show_original = show_original, ...),
+    "survival" = plot_survival_curves(x, n_curves = n_curves, alpha = alpha, show_original = show_original, color = color, palette = palette, ...),
+    "histogram" = plot_histogram_dataset(x, color = color, palette = palette, ...),
+    "boxplot" = plot_boxplot_dataset(x, color = color, palette = palette, ...),
     "trace" = plot_trace_plots(x, ...),
     "pairs" = plot_pairs(x, ...),
     "posterior" = plot_posterior_censored(x, ...),
-    "completed_dataset_summary" = plot_completed_dataset_summary(x, ...),
-    "boxplots_comparison" = plot_boxplots_comparison(x, n_max = n_max %||% 10, ...),
-    "density" = plot_density_comparison(x, ...),
-    stop("Unknown plot type: ", type, ". Options: 'survival', 'trace', 'pairs', 'posterior', 'completed_dataset_summary', 'boxplots_comparison', 'density'")
+    "completed_dataset_summary" = plot_completed_dataset_summary(x, color = color, palette = palette, ...),
+    "boxplots_comparison" = plot_boxplots_comparison(x, n_max = n_max %||% 10, color = color, palette = palette, ...),
+    "density" = plot_density_comparison(x, color = color, palette = palette, ...),
+    stop("Unknown plot type: ", type, ". Options: 'survival', 'histogram' (or 'hist'), 'boxplot' (or 'box'), 'trace', 'pairs', 'posterior', 'completed_dataset_summary', 'boxplots_comparison', 'density'")
   )
 }
 
@@ -296,9 +298,15 @@ print.bayesian_imputation_groups <- function(x, ...) {
 #'   for `type = "boxplots_comparison"`, maximum datasets shown.
 #' @param ... Additional arguments passed to plotting functions.
 #'   For `type = "completed_dataset_summary"`, you can pass:
-#'   `dataset_id = <integer>` and
+#'   `dataset_id = <integer>` or a vector for per-group selection, and
 #'   `panels = c("hist", "density", "survival", "boxplot")`
 #'   (or `"auto"` for the default layout).
+#'   For `type = "density"` and `type = "boxplots_comparison"`,
+#'   you can also pass `dataset_id` similarly.
+#'   For `type = "density"`, you can also pass
+#'   `group_colors = c(...)` (named or in group order).
+#'   For `type = "density"`, `combine_groups = TRUE` overlays all groups
+#'   on one plot and `combine_groups = FALSE` shows separate group panels.
 #' @export
 plot.bayesian_imputation_groups <- function(x, type = "survival", combine_groups = TRUE, 
                                            n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, ...) {
@@ -319,7 +327,7 @@ plot.bayesian_imputation_groups <- function(x, type = "survival", combine_groups
     "posterior" = plot_posterior_censored_groups(x, ...),
     "completed_dataset_summary" = plot_completed_dataset_summary_groups(x, ...),
     "boxplots_comparison" = plot_boxplots_comparison_groups(x, n_max = n_max %||% 10, ...),
-    "density" = plot_density_comparison_groups(x, ...),
+    "density" = plot_density_comparison_groups(x, combine_groups = combine_groups, ...),
     stop("Unknown plot type: ", type, ". Options: 'survival', 'trace', 'pairs', 'posterior', 'completed_dataset_summary', 'boxplots_comparison', 'density'")
   )
 }
@@ -776,78 +784,68 @@ combine_group_datasets_safe <- function(object, dataset, format) {
   # Combine datasets from all groups
   time_col <- object$group_results[[1]]$time_col
   status_col <- object$group_results[[1]]$status_col
-  
-  if (format == "list") {
-    # Return list of combined datasets
-    combined_list <- list()
-    n_datasets <- length(object$group_results[[1]]$imputed_datasets)
-    
-    for (i in seq_len(n_datasets)) {
-      combined_data <- data.frame()
-      for (group_name in object$group_names) {
-        group_data <- object$group_results[[group_name]]$imputed_datasets[[i]]
-        combined_data <- rbind(combined_data, group_data)
-      }
-      combined_data <- format_completed_dataset_output(
-        combined_data,
-        time_col = time_col
-      )
-      combined_data <- standardize_complete_column_order(
-        combined_data,
-        time_col = "imputed_time",
-        status_col = status_col
-      )
-      combined_list[[i]] <- combined_data
+  n_datasets <- min(vapply(object$group_results, function(gr) {
+    length(gr$imputed_datasets)
+  }, integer(1)))
+
+  if (n_datasets < 1) {
+    stop("No completed datasets available for grouped output")
+  }
+
+  if (is.null(dataset)) {
+    dataset_idx <- if (format == "wide") 1L else seq_len(n_datasets)
+  } else {
+    if (!is.numeric(dataset) || any(!is.finite(dataset)) ||
+        any(abs(dataset - round(dataset)) > sqrt(.Machine$double.eps))) {
+      stop("Dataset index must be an integer between 1 and ", n_datasets)
     }
-    return(combined_list)
-    
-  } else if (format == "wide") {
-    # Return single combined dataset
-    if (is.null(dataset)) {
-      # Return first dataset by default
-      dataset <- 1
+    dataset_idx <- as.integer(dataset)
+    if (any(dataset_idx < 1L | dataset_idx > n_datasets)) {
+      stop("Dataset index must be between 1 and ", n_datasets)
     }
-    
+  }
+
+  combine_one <- function(i) {
     combined_data <- data.frame()
     for (group_name in object$group_names) {
-      group_data <- object$group_results[[group_name]]$imputed_datasets[[dataset]]
+      group_data <- object$group_results[[group_name]]$imputed_datasets[[i]]
+      if (!(".imp" %in% names(group_data))) {
+        group_data$.imp <- i
+      }
       combined_data <- rbind(combined_data, group_data)
     }
     combined_data <- format_completed_dataset_output(
       combined_data,
       time_col = time_col
     )
-    combined_data <- standardize_complete_column_order(
+    standardize_complete_column_order(
       combined_data,
       time_col = "imputed_time",
       status_col = status_col
     )
-    return(combined_data)
-    
-  } else if (format == "long") {
-    # Return long format with all datasets combined
-    combined_data <- data.frame()
-    n_datasets <- length(object$group_results[[1]]$imputed_datasets)
-    
-    for (i in seq_len(n_datasets)) {
-      for (group_name in object$group_names) {
-        group_data <- object$group_results[[group_name]]$imputed_datasets[[i]]
-        group_data$.imp <- i
-        combined_data <- rbind(combined_data, group_data)
-      }
-    }
-    
-    # Add row IDs
-    combined_data$.id <- seq_len(nrow(combined_data))
-    combined_data <- format_completed_dataset_output(
-      combined_data,
-      time_col = time_col
-    )
-    combined_data <- standardize_complete_column_order(
-      combined_data,
-      time_col = "imputed_time",
-      status_col = status_col
-    )
-    return(combined_data)
   }
+
+  if (format == "wide") {
+    if (length(dataset_idx) != 1L) {
+      stop("For format = 'wide', provide a single dataset index")
+    }
+    return(combine_one(dataset_idx[[1]]))
+  }
+
+  if (format == "list") {
+    out <- lapply(dataset_idx, combine_one)
+    names(out) <- paste0("dataset_", dataset_idx)
+    return(out)
+  }
+
+  # format == "long"
+  long_data <- do.call(rbind, lapply(dataset_idx, combine_one))
+  if (!(".id" %in% names(long_data))) {
+    long_data$.id <- seq_len(nrow(long_data))
+  }
+  standardize_complete_column_order(
+    long_data,
+    time_col = "imputed_time",
+    status_col = status_col
+  )
 }

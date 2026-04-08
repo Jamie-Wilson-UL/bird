@@ -4,7 +4,16 @@
 \alias{plot_survival_curves}
 \title{Plot survival curves}
 \usage{
-plot_survival_curves(x, n_curves = 10, alpha = 0.3, show_original = TRUE, ...)
+plot_survival_curves(
+  x,
+  n_curves = 10,
+  alpha = 0.3,
+  show_original = TRUE,
+  dataset_id = NULL,
+  palette = NULL,
+  color = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{bayesian_imputation object}

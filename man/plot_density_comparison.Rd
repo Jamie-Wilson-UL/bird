@@ -2,13 +2,15 @@
 % Please edit documentation in R/plotting-helpers.R
 \name{plot_density_comparison}
 \alias{plot_density_comparison}
-\title{Plot density comparison using logspline}
+\title{Plot imputed density using logspline}
 \usage{
 plot_density_comparison(
   x,
   dataset_id = NULL,
   n_curves = NULL,
   alpha = 0.3,
+  palette = NULL,
+  color = NULL,
   ...
 )
 }
@@ -27,6 +29,6 @@ plot_density_comparison(
 ggplot object
 }
 \description{
-Plot density comparison using logspline
+Plot imputed density using logspline
 }
 \keyword{internal}

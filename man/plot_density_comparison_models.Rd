@@ -2,20 +2,23 @@
 % Please edit documentation in R/plotting-helpers.R
 \name{plot_density_comparison_models}
 \alias{plot_density_comparison_models}
-\title{Plot density comparison across models (single selected dataset)}
+\title{Plot density comparison across models}
 \usage{
 plot_density_comparison_models(x, dataset_id = NULL, model_colors = NULL, ...)
 }
 \arguments{
 \item{x}{bird_model_comparison object}
 
-\item{dataset_id}{Dataset index used across all models (NULL for random)}
+\item{dataset_id}{Dataset selection.
+Can be a single shared index (e.g. \code{3}), or one index per model
+using a named vector (e.g. \code{c(weibull = 3, nonparametric = 5)})
+or unnamed vector in model order.}
 
 \item{model_colors}{Optional named/un-named vector of colors for models}
 
 \item{...}{Additional arguments (unused)}
 }
 \description{
-Plot density comparison across models (single selected dataset)
+Plot density comparison across models
 }
 \keyword{internal}

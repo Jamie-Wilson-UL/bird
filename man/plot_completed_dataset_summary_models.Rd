@@ -16,7 +16,10 @@ plot_completed_dataset_summary_models(
 \arguments{
 \item{x}{bird_model_comparison object}
 
-\item{dataset_id}{Dataset index to compare (same index used for all models)}
+\item{dataset_id}{Dataset selection.
+Can be a single shared index (e.g. \code{3}), or one index per model
+using a named vector (e.g. \code{c(weibull = 3, nonparametric = 5)})
+or unnamed vector in model order.}
 
 \item{panels}{Which panels to display. Use \code{"auto"} for default behaviour
 (full 4-panel for <=2 models; survival+boxplot for >2 models),

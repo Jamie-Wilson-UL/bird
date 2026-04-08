@@ -61,6 +61,187 @@ resolve_group_colors <- function(group_names, group_colors = NULL) {
   out
 }
 
+resolve_single_plot_palette <- function(palette = NULL, color = NULL, context = NULL) {
+  defaults <- c(
+    km = "black",
+    imputed = "#7a7a7a",
+    hist_fill = "lightblue",
+    density_line = "darkblue",
+    density_fill = "lightgreen",
+    survival_curve = "red",
+    box_fill = "lightcoral",
+    boxplots_fill = "lightblue"
+  )
+
+  # Simple single-color override for common single-panel use.
+  if (!is.null(color) && length(color) >= 1 && nzchar(as.character(color[1]))) {
+    color <- as.character(color[1])
+    ctx <- tolower(context %||% "")
+    if (ctx == "histogram") {
+      defaults["hist_fill"] <- color
+    } else if (ctx == "survival") {
+      defaults["imputed"] <- color
+      defaults["survival_curve"] <- color
+    } else if (ctx == "density") {
+      defaults["imputed"] <- color
+      defaults["density_line"] <- color
+    } else if (ctx == "boxplots_comparison") {
+      defaults["boxplots_fill"] <- color
+    } else if (ctx == "boxplot") {
+      defaults["box_fill"] <- color
+    } else if (ctx == "completed_dataset_summary") {
+      defaults[c("hist_fill", "density_line", "density_fill", "survival_curve", "box_fill")] <- color
+    }
+  }
+
+  if (is.null(palette)) {
+    return(defaults)
+  }
+
+  palette <- as.character(palette)
+  names_palette <- names(palette)
+  if (is.null(names_palette) || !any(nzchar(names_palette))) {
+    return(defaults)
+  }
+
+  alias <- c(
+    original = "km",
+    histogram = "hist_fill",
+    hist = "hist_fill",
+    density = "density_line",
+    density_color = "density_line",
+    survival = "survival_curve",
+    survival_color = "survival_curve",
+    boxplot = "box_fill",
+    boxplot_fill = "box_fill",
+    boxplots = "boxplots_fill"
+  )
+
+  nm <- tolower(names_palette)
+  nm <- ifelse(nm %in% names(alias), alias[nm], nm)
+  valid <- nm %in% names(defaults)
+  if (any(valid)) {
+    defaults[nm[valid]] <- palette[valid]
+  }
+
+  defaults
+}
+
+validate_dataset_indices <- function(dataset_id, n_datasets) {
+  if (is.null(dataset_id)) {
+    return(NULL)
+  }
+  if (!is.numeric(dataset_id) || any(!is.finite(dataset_id))) {
+    stop("dataset_id must be numeric with values between 1 and ", n_datasets)
+  }
+  if (any(abs(dataset_id - round(dataset_id)) > sqrt(.Machine$double.eps))) {
+    stop("dataset_id values must be integers between 1 and ", n_datasets)
+  }
+  idx <- unique(as.integer(dataset_id))
+  if (length(idx) < 1 || any(idx < 1 | idx > n_datasets)) {
+    stop("dataset_id must be between 1 and ", n_datasets)
+  }
+  idx
+}
+
+resolve_comparison_dataset_ids <- function(dataset_id, keys, n_by_key, label = "dataset_id") {
+  keys <- as.character(keys)
+  n_by_key <- as.integer(n_by_key)
+  names(n_by_key) <- keys
+  n_common <- min(n_by_key)
+
+  if (is.null(dataset_id)) {
+    id <- sample(seq_len(n_common), 1)
+    out <- rep(id, length(keys))
+    names(out) <- keys
+    return(out)
+  }
+
+  if (is.numeric(dataset_id) && length(dataset_id) == 1 && is.finite(dataset_id)) {
+    if (abs(dataset_id - round(dataset_id)) > sqrt(.Machine$double.eps)) {
+      stop(label, " must be integer-valued")
+    }
+    id <- as.integer(dataset_id)
+    if (id < 1 || id > n_common) {
+      stop(label, " must be between 1 and ", n_common, " when a single shared value is supplied")
+    }
+    out <- rep(id, length(keys))
+    names(out) <- keys
+    return(out)
+  }
+
+  if (!is.numeric(dataset_id) || any(!is.finite(dataset_id))) {
+    stop(label, " must be numeric")
+  }
+  if (any(abs(dataset_id - round(dataset_id)) > sqrt(.Machine$double.eps))) {
+    stop(label, " values must be integers")
+  }
+
+  ids <- dataset_id
+  storage.mode(ids) <- "integer"
+  nm <- names(dataset_id)
+
+  if (!is.null(nm) && any(nzchar(nm))) {
+    if (!all(keys %in% nm)) {
+      stop("Named ", label, " must include all names: ", paste(keys, collapse = ", "))
+    }
+    out <- ids[keys]
+    names(out) <- keys
+  } else {
+    if (length(ids) != length(keys)) {
+      stop("When ", label, " is an unnamed vector, provide one value per entry in this order: ",
+           paste(keys, collapse = ", "))
+    }
+    out <- ids
+    names(out) <- keys
+  }
+
+  bad <- names(out)[out < 1 | out > n_by_key[names(out)]]
+  if (length(bad) > 0) {
+    details <- paste0(bad, " (1-", n_by_key[bad], ")", collapse = ", ")
+    stop("Invalid ", label, " values for: ", details)
+  }
+
+  out
+}
+
+dataset_labels <- function(indices) {
+  paste("Dataset", indices)
+}
+
+resolve_dataset_colors <- function(indices, color = NULL) {
+  labels <- dataset_labels(indices)
+  n <- length(indices)
+  out <- grDevices::hcl.colors(n, "Dark 3")
+  names(out) <- labels
+
+  if (is.null(color)) {
+    return(out)
+  }
+
+  color <- as.character(color)
+  if (!is.null(names(color)) && any(nzchar(names(color)))) {
+    nm <- names(color)
+    # Accept names as labels ("Dataset 3") or raw ids ("3")
+    map <- out
+    for (i in seq_along(color)) {
+      key <- nm[i]
+      if (key %in% labels) {
+        map[key] <- color[i]
+      } else if (key %in% as.character(indices)) {
+        map[paste("Dataset", key)] <- color[i]
+      }
+    }
+    return(map)
+  }
+
+  if (length(color) < n) {
+    color <- rep(color, length.out = n)
+  }
+  out[] <- color[seq_len(n)]
+  out
+}
+
 #' Plot survival curves 
 #' @param x bayesian_imputation object
 #' @param n_curves Number of imputed curves to show (default: 10)
@@ -68,7 +249,7 @@ resolve_group_colors <- function(group_names, group_colors = NULL) {
 #' @param show_original Whether to show original Kaplan-Meier curves (default: TRUE)
 #' @return ggplot object
 #' @keywords internal
-plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = TRUE, ...) {
+plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = TRUE, dataset_id = NULL, palette = NULL, color = NULL, ...) {
   
   if (!requireNamespace("survival", quietly = TRUE)) {
     stop("survival package required for Kaplan-Meier curves")
@@ -85,54 +266,97 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
   )
   orig_df <- data.frame(time = km_orig$time, survival = km_orig$surv, type = "KM estimation")
   
-  # Sample imputed datasets for plotting (representative sample)
-  n_show <- min(n_curves, length(x$imputed_datasets))
-  selected_datasets <- sample(x$imputed_datasets, n_show)
+  # Select imputed datasets for plotting (specific dataset if requested, otherwise sample)
+  n_total <- length(x$imputed_datasets)
+  dataset_id_provided <- !is.null(dataset_id)
+  selected_indices <- validate_dataset_indices(dataset_id, n_total)
+  if (!is.null(selected_indices)) {
+    selected_indices <- sort(selected_indices)
+  } else {
+    n_show <- min(n_curves, n_total)
+    selected_indices <- sort(sample(seq_len(n_total), n_show))
+  }
+  selected_datasets <- x$imputed_datasets[selected_indices]
+  n_show <- length(selected_indices)
   
   # Compute survival curves for imputed datasets
   imputed_curves <- vector("list", n_show)
   
-  for (i in 1:n_show) {
+  for (j in seq_len(n_show)) {
+    i <- selected_indices[j]
     km_imp <- survival::survfit(
       as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
-      data = selected_datasets[[i]]
+      data = selected_datasets[[j]]
     )
     
-    imputed_curves[[i]] <- data.frame(
+    imputed_curves[[j]] <- data.frame(
       time = km_imp$time,
       survival = km_imp$surv,
       type = "Bayesian imputation",
-      dataset_id = i
+      dataset_id = i,
+      dataset_label = paste("Dataset", i),
+      stringsAsFactors = FALSE
     )
   }
   
   imputed_df <- do.call(rbind, imputed_curves)
   
   # Combine data (keep dataset_id for grouping)
-  plot_data <- imputed_df[, c("time", "survival", "type", "dataset_id")]
+  plot_data <- imputed_df[, c("time", "survival", "type", "dataset_id", "dataset_label")]
   
   # Create plot 
-  p <- ggplot2::ggplot() +
-    # Imputed curves - thin gray lines with transparency
-    ggplot2::geom_step(
-      data = plot_data,
-      ggplot2::aes(x = time, y = survival, color = type, group = interaction(type, dataset_id)),
-      alpha = alpha, linewidth = 0.6
-    ) +
-    # Original curve - black line (if requested)
-    {if (show_original) ggplot2::geom_step(
-      data = orig_df,
-      ggplot2::aes(x = time, y = survival, color = type),
-      linewidth = 0.7
-    )} +
-    ggplot2::scale_color_manual(values = c("KM estimation" = "black", "Bayesian imputation" = "#7a7a7a")) +
-    ggplot2::labs(
-      title = paste0("Bayesian Imputation (n = ", n_show, ") vs Kaplan-Meier"),
-      subtitle = NULL,
-      x = paste0("Time (", x$model_info$time_unit %||% "days", ")"), 
-      y = "Survival probability", color = NULL
-    ) +
-    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
+  palette_map <- resolve_single_plot_palette(palette = palette, color = color, context = "survival")
+  title_text <- if (!dataset_id_provided) {
+    paste0("Bayesian Imputation (n = ", n_show, ") vs Kaplan-Meier")
+  } else if (length(selected_indices) == 1) {
+    paste0("Bayesian Imputation (dataset ", selected_indices[1], ") vs Kaplan-Meier")
+  } else {
+    paste0("Bayesian Imputation (datasets: ", paste(selected_indices, collapse = ", "), ") vs Kaplan-Meier")
+  }
+  if (length(selected_indices) > 1 && dataset_id_provided) {
+    selected_labels <- dataset_labels(selected_indices)
+    color_map <- resolve_dataset_colors(selected_indices, color = color)
+    p <- ggplot2::ggplot() +
+      ggplot2::geom_step(
+        data = plot_data,
+        ggplot2::aes(x = time, y = survival, color = dataset_label, group = dataset_label),
+        alpha = alpha, linewidth = 0.8
+      ) +
+      {if (show_original) ggplot2::geom_step(
+        data = orig_df,
+        ggplot2::aes(x = time, y = survival),
+        color = palette_map[["km"]], linewidth = 0.8
+      )} +
+      ggplot2::scale_color_manual(values = color_map, breaks = selected_labels, name = "Imputed dataset") +
+      ggplot2::labs(
+        title = title_text,
+        subtitle = NULL,
+        x = paste0("Time (", x$model_info$time_unit %||% "days", ")"), 
+        y = "Survival probability"
+      ) +
+      ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
+  } else {
+    imputed_col <- if (!dataset_id_provided && length(selected_indices) > 1) "gray55" else palette_map[["imputed"]]
+    p <- ggplot2::ggplot() +
+      ggplot2::geom_step(
+        data = plot_data,
+        ggplot2::aes(x = time, y = survival, color = type, group = interaction(type, dataset_id)),
+        alpha = alpha, linewidth = 0.6
+      ) +
+      {if (show_original) ggplot2::geom_step(
+        data = orig_df,
+        ggplot2::aes(x = time, y = survival, color = type),
+        linewidth = 0.7
+      )} +
+      ggplot2::scale_color_manual(values = c("KM estimation" = palette_map[["km"]], "Bayesian imputation" = imputed_col)) +
+      ggplot2::labs(
+        title = title_text,
+        subtitle = NULL,
+        x = paste0("Time (", x$model_info$time_unit %||% "days", ")"), 
+        y = "Survival probability", color = NULL
+      ) +
+      ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
+  }
 
   p <- style_bird_plot(
     p,
@@ -141,8 +365,8 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
     base_size = 13
   )
   
-  # Add median survival lines from imputed datasets (mean median across imputations)
-  all_medians <- sapply(x$imputed_datasets, function(ds) {
+  # Add median survival lines from selected imputed datasets
+  all_medians <- sapply(selected_datasets, function(ds) {
     fit <- survival::survfit(as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")), data = ds)
     idx <- which(fit$surv <= 0.5)[1]
     if (!is.na(idx)) fit$time[idx] else max(fit$time)
@@ -157,12 +381,12 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
       ggplot2::geom_segment(
         data = hseg,
         ggplot2::aes(x = x_start, y = y, xend = x_end, yend = y_end),
-        inherit.aes = FALSE, linetype = "dotted", linewidth = 0.8, alpha = 0.7, color = "red"
+        inherit.aes = FALSE, linetype = "dotted", linewidth = 0.8, alpha = 0.7, color = palette_map[["survival_curve"]]
       ) +
       ggplot2::geom_segment(
         data = vseg,
         ggplot2::aes(x = x_start, y = y, xend = x_end, yend = y_end),
-        inherit.aes = FALSE, linetype = "dotted", linewidth = 0.8, alpha = 0.7, color = "red"
+        inherit.aes = FALSE, linetype = "dotted", linewidth = 0.8, alpha = 0.7, color = palette_map[["survival_curve"]]
       )
   }
   
@@ -186,29 +410,39 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
 #' Plot boxplots comparison of all completed datasets
 #' @param x bayesian_imputation object
 #' @param n_max Number of datasets to sample for boxplots (default: 10)
-#' @param dataset_indices Optional indices of datasets to include (random if NULL)
+#' @param dataset_id Optional dataset ids to include (random if NULL)
+#' @param dataset_indices Deprecated alias for `dataset_id`
 #' @return ggplot object
 #' @keywords internal
-plot_boxplots_comparison <- function(x, n_max = 10, dataset_indices = NULL, ...) {
+plot_boxplots_comparison <- function(x, n_max = 10, dataset_id = NULL, dataset_indices = NULL, palette = NULL, color = NULL, ...) {
   
   # Extract time variable name
   time_var <- x$time_col
+  palette_map <- resolve_single_plot_palette(palette = palette, color = color, context = "boxplots_comparison")
   
+  if (!is.null(dataset_indices)) {
+    if (!is.null(dataset_id)) {
+      stop("Please supply only one of 'dataset_id' or 'dataset_indices'")
+    }
+    dataset_id <- dataset_indices
+  }
+
   # Select at most n_max random datasets
   total <- length(x$imputed_datasets)
-  if (is.null(dataset_indices)) {
+  selected_indices <- validate_dataset_indices(dataset_id, total)
+  if (is.null(selected_indices)) {
     k <- min(n_max, total)
-    dataset_indices <- sort(sample(seq_len(total), k))
+    selected_indices <- sort(sample(seq_len(total), k))
   }
   
   # Prepare data for selected datasets
-  all_data <- vector("list", length(dataset_indices))
-  for (j in seq_along(dataset_indices)) {
-    i <- dataset_indices[j]
+  all_data <- vector("list", length(selected_indices))
+  for (j in seq_along(selected_indices)) {
+    i <- selected_indices[j]
     ds <- x$imputed_datasets[[i]]
     all_data[[j]] <- data.frame(
       time = ds[[time_var]],
-      dataset = factor(paste("Dataset", i), levels = paste("Dataset", dataset_indices)),
+      dataset = factor(paste("Dataset", i), levels = paste("Dataset", selected_indices)),
       stringsAsFactors = FALSE
     )
   }
@@ -218,10 +452,14 @@ plot_boxplots_comparison <- function(x, n_max = 10, dataset_indices = NULL, ...)
   
   # Create boxplot
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(y = dataset, x = time)) +
-    ggplot2::geom_boxplot(fill = "lightblue", alpha = 0.7, outlier.alpha = 0.3) +
+    ggplot2::geom_boxplot(fill = palette_map[["boxplots_fill"]], alpha = 0.7, outlier.alpha = 0.3) +
     ggplot2::labs(
       title = "Distribution of Survival Times Across Imputed Datasets",
-      subtitle = paste("Comparing", length(dataset_indices), "sampled datasets (of", total, ")"),
+      subtitle = if (is.null(dataset_id)) {
+        paste("Comparing", length(selected_indices), "sampled datasets (of", total, ")")
+      } else {
+        paste("Comparing selected datasets:", paste(selected_indices, collapse = ", "))
+      },
       x = "Survival Time",
       y = "Imputed Dataset"
     )
@@ -231,14 +469,153 @@ plot_boxplots_comparison <- function(x, n_max = 10, dataset_indices = NULL, ...)
   return(p)
 }
 
-plot_boxplots_comparison_groups <- function(x, n_max = 10, ...) {
+#' Plot histogram for a single completed dataset
+#' @param x bayesian_imputation object
+#' @param dataset_id Dataset index to plot (NULL for random)
+#' @param palette Optional color overrides
+#' @param ... Additional arguments
+#' @return ggplot object
+#' @keywords internal
+plot_histogram_dataset <- function(x, dataset_id = NULL, palette = NULL, color = NULL, ...) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("ggplot2 package required for plotting")
+  }
+
+  n_datasets <- length(x$imputed_datasets)
+  if (n_datasets < 1) {
+    stop("No imputed datasets available")
+  }
+
+  selected_indices <- validate_dataset_indices(dataset_id, n_datasets)
+  if (is.null(selected_indices)) {
+    selected_indices <- sample(seq_len(n_datasets), 1)
+  }
+  selected_indices <- sort(selected_indices)
+
+  palette_map <- resolve_single_plot_palette(palette = palette, color = color, context = "histogram")
+  time_var <- x$time_col
+  if (length(selected_indices) == 1) {
+    ds <- x$imputed_datasets[[selected_indices]]
+    p <- ggplot2::ggplot(ds, ggplot2::aes(x = .data[[time_var]])) +
+      ggplot2::geom_histogram(bins = 30, fill = palette_map[["hist_fill"]], alpha = 0.75) +
+      ggplot2::labs(
+        title = paste("Histogram - Completed Dataset", selected_indices),
+        x = paste0("Time (", x$model_info$time_unit %||% "days", ")"),
+        y = "Count"
+      )
+  } else {
+    all_data <- do.call(
+      rbind,
+      lapply(selected_indices, function(i) {
+        data.frame(
+          .time = x$imputed_datasets[[i]][[time_var]],
+          .dataset = factor(paste("Dataset", i), levels = dataset_labels(selected_indices)),
+          stringsAsFactors = FALSE
+        )
+      })
+    )
+    color_map <- resolve_dataset_colors(selected_indices, color = color)
+    p <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, fill = .dataset)) +
+      ggplot2::geom_histogram(bins = 30, alpha = 0.45, position = "identity") +
+      ggplot2::scale_fill_manual(values = color_map, name = "Imputed dataset") +
+      ggplot2::labs(
+        title = paste0("Histogram Comparison - Datasets ", paste(selected_indices, collapse = ", ")),
+        x = paste0("Time (", x$model_info$time_unit %||% "days", ")"),
+        y = "Count"
+      )
+  }
+  style_bird_plot(
+    p,
+    legend_position = if (length(selected_indices) == 1) "none" else c(0.98, 0.98),
+    legend_justification = if (length(selected_indices) == 1) NULL else c(1, 1),
+    base_size = 12
+  )
+}
+
+#' Plot boxplot for one or more completed datasets
+#' @param x bayesian_imputation object
+#' @param dataset_id Dataset index/indices to plot (NULL for random)
+#' @param palette Optional color overrides
+#' @param ... Additional arguments
+#' @return ggplot object
+#' @keywords internal
+plot_boxplot_dataset <- function(x, dataset_id = NULL, palette = NULL, color = NULL, ...) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("ggplot2 package required for plotting")
+  }
+
+  n_datasets <- length(x$imputed_datasets)
+  if (n_datasets < 1) {
+    stop("No imputed datasets available")
+  }
+
+  selected_indices <- validate_dataset_indices(dataset_id, n_datasets)
+  if (is.null(selected_indices)) {
+    selected_indices <- sample(seq_len(n_datasets), 1)
+  }
+  selected_indices <- sort(selected_indices)
+
+  palette_map <- resolve_single_plot_palette(palette = palette, color = color, context = "boxplot")
+  time_var <- x$time_col
+
+  if (length(selected_indices) == 1) {
+    ds <- x$imputed_datasets[[selected_indices]]
+    p <- ggplot2::ggplot(ds, ggplot2::aes(x = "", y = .data[[time_var]])) +
+      ggplot2::geom_boxplot(fill = palette_map[["box_fill"]], alpha = 0.75, outlier.alpha = 0.3) +
+      ggplot2::labs(
+        title = paste("Boxplot - Completed Dataset", selected_indices),
+        x = "",
+        y = paste0("Time (", x$model_info$time_unit %||% "days", ")")
+      )
+  } else {
+    plot_data <- do.call(
+      rbind,
+      lapply(selected_indices, function(i) {
+        data.frame(
+          .time = x$imputed_datasets[[i]][[time_var]],
+          .dataset = factor(paste("Dataset", i), levels = dataset_labels(selected_indices)),
+          stringsAsFactors = FALSE
+        )
+      })
+    )
+    color_map <- resolve_dataset_colors(selected_indices, color = color)
+    p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = .dataset, y = .time, fill = .dataset)) +
+      ggplot2::geom_boxplot(alpha = 0.75, outlier.alpha = 0.3) +
+      ggplot2::scale_fill_manual(values = color_map, name = "Imputed dataset") +
+      ggplot2::labs(
+        title = paste0("Boxplot Comparison - Datasets ", paste(selected_indices, collapse = ", ")),
+        x = "Imputed dataset",
+        y = paste0("Time (", x$model_info$time_unit %||% "days", ")")
+      )
+  }
+
+  style_bird_plot(
+    p,
+    legend_position = "none",
+    base_size = 12
+  )
+}
+
+plot_boxplots_comparison_groups <- function(x, n_max = 10, dataset_id = NULL, dataset_indices = NULL, ...) {
   if (!requireNamespace("gridExtra", quietly = TRUE)) {
     stop("gridExtra package required for arranging plots")
   }
+  if (!is.null(dataset_indices)) {
+    if (!is.null(dataset_id)) {
+      stop("Please supply only one of 'dataset_id' or 'dataset_indices'")
+    }
+    dataset_id <- dataset_indices
+  }
   # Use the same dataset indices across groups when possible
   num_per_group <- sapply(x$group_results, function(gr) length(gr$imputed_datasets))
-  k <- min(n_max, min(num_per_group))
-  dataset_indices <- sort(sample(seq_len(min(num_per_group)), k))
+  n_common <- min(num_per_group)
+  dataset_indices <- validate_dataset_indices(dataset_id, n_common)
+  if (is.null(dataset_indices)) {
+    k <- min(n_max, n_common)
+    dataset_indices <- sort(sample(seq_len(n_common), k))
+  } else {
+    k <- length(dataset_indices)
+  }
   
   # Compute global x-range across both groups and selected datasets
   # Use each group's time column for extraction
@@ -261,7 +638,7 @@ plot_boxplots_comparison_groups <- function(x, n_max = 10, ...) {
   grobs <- list()
   for (gname in x$group_names) {
     gr <- x$group_results[[gname]]
-    p <- plot_boxplots_comparison(gr, n_max = n_max, dataset_indices = dataset_indices, ...)
+    p <- plot_boxplots_comparison(gr, n_max = n_max, dataset_id = dataset_indices, ...)
     p <- p + ggplot2::labs(title = paste0("Group: ", gname, " -- Boxplots (", k, ")"), subtitle = NULL)
     p <- p + ggplot2::coord_cartesian(xlim = xr)
     grobs[[length(grobs) + 1]] <- p
@@ -569,23 +946,23 @@ arrange_completed_summary_panels <- function(panel_grobs, title_text) {
 #' @param ... Additional arguments
 #' @return ggplot object
 #' @keywords internal
-plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto", ...) {
+plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto", palette = NULL, color = NULL, ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
   }
   
-  # Select dataset
-  if (is.null(dataset_id)) {
-    dataset_id <- sample(seq_along(x$imputed_datasets), 1)
+  palette_map <- resolve_single_plot_palette(palette = palette, color = color, context = "completed_dataset_summary")
+
+  n_datasets <- length(x$imputed_datasets)
+  selected_indices <- validate_dataset_indices(dataset_id, n_datasets)
+  if (is.null(selected_indices)) {
+    selected_indices <- sample(seq_len(n_datasets), 1)
   }
-  
-  if (dataset_id < 1 || dataset_id > length(x$imputed_datasets)) {
-    stop("Invalid dataset_id")
-  }
-  
-  # Get the selected dataset
-  dataset <- x$imputed_datasets[[dataset_id]]
+  selected_indices <- sort(selected_indices)
+
+  # Get selected dataset(s)
+  dataset <- x$imputed_datasets[[selected_indices[1]]]
   time_var <- x$time_col
   status_var <- x$status_col
   
@@ -596,17 +973,92 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
   )
 
   panel_grobs <- list()
+  is_multi <- length(selected_indices) > 1
+  multi_labels <- dataset_labels(selected_indices)
+  multi_colors <- resolve_dataset_colors(selected_indices, color = color)
+
+  if (is_multi) {
+    all_data <- do.call(
+      rbind,
+      lapply(selected_indices, function(i) {
+        data.frame(
+          .time = x$imputed_datasets[[i]][[time_var]],
+          .status = x$imputed_datasets[[i]][[status_var]],
+          .dataset = factor(paste("Dataset", i), levels = multi_labels),
+          stringsAsFactors = FALSE
+        )
+      })
+    )
+  }
 
   if ("hist" %in% selected_panels) {
-    p_hist <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
-      ggplot2::geom_histogram(bins = 30, fill = "lightblue", alpha = 0.7) +
-      ggplot2::labs(title = "Histogram", x = "Time", y = "Count")
-    p_hist <- style_bird_plot(p_hist, legend_position = "none", base_size = 11)
+    if (is_multi) {
+      p_hist <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, fill = .dataset)) +
+        ggplot2::geom_histogram(bins = 30, alpha = 0.45, position = "identity") +
+        ggplot2::scale_fill_manual(values = multi_colors, name = "Imputed dataset") +
+        ggplot2::labs(title = "Histogram", x = "Time", y = "Count")
+    } else {
+      p_hist <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
+        ggplot2::geom_histogram(bins = 30, fill = palette_map[["hist_fill"]], alpha = 0.7) +
+        ggplot2::labs(title = "Histogram", x = "Time", y = "Count")
+    }
+    p_hist <- style_bird_plot(
+      p_hist,
+      legend_position = if (is_multi) c(0.98, 0.98) else "none",
+      legend_justification = if (is_multi) c(1, 1) else NULL,
+      base_size = 11
+    )
     panel_grobs$hist <- p_hist
   }
 
   if ("density" %in% selected_panels) {
-    if (requireNamespace("logspline", quietly = TRUE)) {
+    if (is_multi) {
+      density_data <- data.frame()
+      pooled <- all_data$.time[is.finite(all_data$.time) & all_data$.time >= 0]
+      pooled <- pmax(pooled, .Machine$double.eps)
+      qlo <- max(0, stats::quantile(pooled, 0.005, na.rm = TRUE))
+      qhi <- stats::quantile(pooled, 0.995, na.rm = TRUE)
+      if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
+        qlo <- min(pooled, na.rm = TRUE)
+        qhi <- max(pooled, na.rm = TRUE)
+      }
+      x_grid <- seq(qlo, qhi, length.out = 400)
+
+      for (i in selected_indices) {
+        vals <- x$imputed_datasets[[i]][[time_var]]
+        vals <- vals[is.finite(vals) & vals >= 0]
+        vals <- pmax(vals, .Machine$double.eps)
+        y_density <- NULL
+        if (requireNamespace("logspline", quietly = TRUE)) {
+          ls_fit <- tryCatch(
+            logspline::logspline(vals, lbound = 0, maxknots = 6),
+            error = function(e) tryCatch(logspline::logspline(vals, lbound = 0), error = function(e2) NULL)
+          )
+          if (!is.null(ls_fit)) {
+            y_density <- logspline::dlogspline(x_grid, ls_fit)
+          }
+        }
+        if (is.null(y_density)) {
+          dens <- stats::density(vals, from = min(x_grid), to = max(x_grid), n = length(x_grid))
+          y_density <- stats::approx(dens$x, dens$y, xout = x_grid, rule = 2)$y
+        }
+        density_data <- rbind(
+          density_data,
+          data.frame(x = x_grid, y = y_density, .dataset = factor(paste("Dataset", i), levels = multi_labels), stringsAsFactors = FALSE)
+        )
+      }
+
+      p_density <- ggplot2::ggplot(density_data, ggplot2::aes(x = x, y = y, color = .dataset)) +
+        ggplot2::geom_line(linewidth = 1, alpha = 0.9) +
+        ggplot2::scale_color_manual(values = multi_colors, name = "Imputed dataset") +
+        ggplot2::labs(title = "Density", x = "Time", y = "Density")
+      p_density <- style_bird_plot(
+        p_density,
+        legend_position = if (is_multi) c(0.98, 0.98) else "none",
+        legend_justification = if (is_multi) c(1, 1) else NULL,
+        base_size = 11
+      )
+    } else if (requireNamespace("logspline", quietly = TRUE)) {
       x_vals <- dataset[[time_var]]
       x_vals <- x_vals[is.finite(x_vals) & x_vals >= 0]
       x_vals <- pmax(x_vals, .Machine$double.eps)
@@ -647,12 +1099,12 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
       }
 
       p_density <- ggplot2::ggplot(data.frame(x = x_grid, y = y_density), ggplot2::aes(x = x, y = y)) +
-        ggplot2::geom_line(color = "darkblue", linewidth = 1) +
+        ggplot2::geom_line(color = palette_map[["density_line"]], linewidth = 1) +
         ggplot2::labs(title = "Density", x = "Time", y = "Density")
       p_density <- style_bird_plot(p_density, legend_position = "none", base_size = 11)
     } else {
       p_density <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
-        ggplot2::geom_density(fill = "lightgreen", alpha = 0.7) +
+        ggplot2::geom_density(fill = palette_map[["density_fill"]], alpha = 0.7) +
         ggplot2::labs(title = "Density", x = "Time", y = "Density")
       p_density <- style_bird_plot(p_density, legend_position = "none", base_size = 11)
     }
@@ -660,36 +1112,81 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
   }
 
   if ("survival" %in% selected_panels) {
-    km_fit <- survival::survfit(
-      as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
-      data = dataset
+    if (is_multi) {
+      surv_data <- do.call(
+        rbind,
+        lapply(selected_indices, function(i) {
+          km <- survival::survfit(
+            as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
+            data = x$imputed_datasets[[i]]
+          )
+          data.frame(
+            time = km$time,
+            survival = km$surv,
+            .dataset = factor(paste("Dataset", i), levels = multi_labels),
+            stringsAsFactors = FALSE
+          )
+        })
+      )
+      p_survival <- ggplot2::ggplot(surv_data, ggplot2::aes(x = time, y = survival, color = .dataset)) +
+        ggplot2::geom_step(linewidth = 1) +
+        ggplot2::scale_color_manual(values = multi_colors, name = "Imputed dataset") +
+        ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability")
+    } else {
+      km_fit <- survival::survfit(
+        as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
+        data = dataset
+      )
+      p_survival <- ggplot2::ggplot(data.frame(time = km_fit$time, survival = km_fit$surv),
+                                    ggplot2::aes(x = time, y = survival)) +
+        ggplot2::geom_step(color = palette_map[["survival_curve"]], linewidth = 1) +
+        ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability")
+    }
+    p_survival <- style_bird_plot(
+      p_survival,
+      legend_position = if (is_multi) c(0.98, 0.98) else "none",
+      legend_justification = if (is_multi) c(1, 1) else NULL,
+      base_size = 11
     )
-    p_survival <- ggplot2::ggplot(data.frame(time = km_fit$time, survival = km_fit$surv),
-                                  ggplot2::aes(x = time, y = survival)) +
-      ggplot2::geom_step(color = "red", linewidth = 1) +
-      ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability")
-    p_survival <- style_bird_plot(p_survival, legend_position = "none", base_size = 11)
     panel_grobs$survival <- p_survival
   }
 
   if ("boxplot" %in% selected_panels) {
-    p_boxplot <- ggplot2::ggplot(dataset, ggplot2::aes(x = "", y = .data[[time_var]])) +
-      ggplot2::geom_boxplot(fill = "lightcoral", alpha = 0.7) +
-      ggplot2::labs(title = "Boxplot", x = "", y = "Survival Time")
-    p_boxplot <- style_bird_plot(p_boxplot, legend_position = "none", base_size = 11)
+    if (is_multi) {
+      p_boxplot <- ggplot2::ggplot(all_data, ggplot2::aes(x = .dataset, y = .time, fill = .dataset)) +
+        ggplot2::geom_boxplot(alpha = 0.7) +
+        ggplot2::scale_fill_manual(values = multi_colors, name = "Imputed dataset") +
+        ggplot2::labs(title = "Boxplot", x = "Dataset", y = "Survival Time")
+    } else {
+      p_boxplot <- ggplot2::ggplot(dataset, ggplot2::aes(x = "", y = .data[[time_var]])) +
+        ggplot2::geom_boxplot(fill = palette_map[["box_fill"]], alpha = 0.7) +
+        ggplot2::labs(title = "Boxplot", x = "", y = "Survival Time")
+    }
+    p_boxplot <- style_bird_plot(
+      p_boxplot,
+      legend_position = "none",
+      base_size = 11
+    )
     panel_grobs$boxplot <- p_boxplot
   }
 
   ordered_panels <- panel_grobs[selected_panels]
   arrange_completed_summary_panels(
     ordered_panels,
-    paste("Completed Dataset", dataset_id, "Summary")
+    if (is_multi) {
+      paste("Completed Dataset Comparison:", paste(selected_indices, collapse = ", "))
+    } else {
+      paste("Completed Dataset", selected_indices[1], "Summary")
+    }
   )
 }
 
 #' Plot completed dataset summary for groups (overlaid comparison)
 #' @param x bayesian_imputation_groups object
-#' @param dataset_id Dataset ID to plot (NULL for random)
+#' @param dataset_id Dataset selection.
+#'   Can be a single shared index (e.g. `3`), or one index per group
+#'   using a named vector (e.g. `c(A = 3, B = 5)`)
+#'   or unnamed vector in group order.
 #' @param panels Which panels to display. Use `"auto"` for default behaviour
 #'   (full 4-panel for <=2 groups; survival+boxplot for >2 groups),
 #'   or any combination of `c("hist", "density", "survival", "boxplot")`.
@@ -704,27 +1201,20 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
     stop("ggplot2 package required for plotting")
   }
   
-  # Select dataset ID if not provided
-  if (is.null(dataset_id)) {
-    # Use the same dataset ID across all groups for fair comparison
-    max_datasets <- min(sapply(x$group_results, function(g) length(g$imputed_datasets)))
-    dataset_id <- sample(1:max_datasets, 1)
-  }
-  
-  # Check if dataset_id is valid for all groups
-  for (group_name in x$group_names) {
-    if (dataset_id < 1 || dataset_id > length(x$group_results[[group_name]]$imputed_datasets)) {
-      stop("Invalid dataset_id for group: ", group_name)
-    }
-  }
+  n_by_group <- vapply(x$group_results, function(g) length(g$imputed_datasets), integer(1))
+  ids_by_group <- resolve_comparison_dataset_ids(
+    dataset_id = dataset_id,
+    keys = x$group_names,
+    n_by_key = n_by_group,
+    label = "dataset_id"
+  )
 
   group_color_map <- resolve_group_colors(x$group_names, group_colors)
   
   # Get datasets for each group
   group_datasets <- list()
   for (group_name in x$group_names) {
-    group_datasets[[group_name]] <- x$group_results[[group_name]]$imputed_datasets[[dataset_id]]
-    # Add group column for plotting
+    group_datasets[[group_name]] <- x$group_results[[group_name]]$imputed_datasets[[ids_by_group[[group_name]]]]
     group_datasets[[group_name]]$group <- group_name
   }
   
@@ -787,8 +1277,7 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
       x_grid <- seq(qlo, qhi, length.out = 400)
 
       density_data <- data.frame()
-      for (i in seq_along(x$group_names)) {
-        group_name <- x$group_names[i]
+      for (group_name in x$group_names) {
         group_data <- group_datasets[[group_name]]
         x_vals <- group_data[[time_var]]
         x_vals <- x_vals[is.finite(x_vals) & x_vals >= 0]
@@ -833,8 +1322,7 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
 
   if ("survival" %in% selected_panels) {
     survival_data <- data.frame()
-    for (i in seq_along(x$group_names)) {
-      group_name <- x$group_names[i]
+    for (group_name in x$group_names) {
       group_data <- group_datasets[[group_name]]
       km_fit <- survival::survfit(
         as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
@@ -847,7 +1335,6 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
         stringsAsFactors = FALSE
       ))
     }
-
     p_survival <- ggplot2::ggplot(survival_data, ggplot2::aes(x = time, y = survival, color = group)) +
       ggplot2::geom_step(linewidth = 1, alpha = alpha) +
       ggplot2::scale_color_manual(values = group_color_map) +
@@ -861,14 +1348,15 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
       ggplot2::geom_boxplot(alpha = alpha) +
       ggplot2::scale_fill_manual(values = group_color_map) +
       ggplot2::labs(title = "Boxplots", x = "Group", y = "Survival Time", fill = "Group")
-    p_boxplot <- style_bird_plot(p_boxplot, base_size = 11)
+    p_boxplot <- style_bird_plot(p_boxplot, legend_position = "none", base_size = 11)
     panel_grobs$boxplot <- p_boxplot
   }
 
   ordered_panels <- panel_grobs[selected_panels]
+  subtitle_map <- paste0(names(ids_by_group), "=", as.integer(ids_by_group), collapse = ", ")
   arrange_completed_summary_panels(
     ordered_panels,
-    paste("Completed Dataset", dataset_id, "Summary - Group Comparison")
+    paste("Completed Dataset Summary - Group Comparison (", subtitle_map, ")", sep = "")
   )
 }
 
@@ -1006,11 +1494,12 @@ plot_survival_curves_models <- function(x, show_original = TRUE, n_grid = 200, a
 #' Plot boxplots comparison across models
 #' @param x bird_model_comparison object
 #' @param n_max Number of datasets to sample (default: 10)
-#' @param dataset_indices Optional dataset indices to include (shared across models)
+#' @param dataset_id Optional dataset ids to include (shared across models)
+#' @param dataset_indices Deprecated alias for `dataset_id`
 #' @param model_colors Optional named/un-named vector of colors for models
 #' @param ... Additional arguments (unused)
 #' @keywords internal
-plot_boxplots_comparison_models <- function(x, n_max = 10, dataset_indices = NULL, model_colors = NULL, ...) {
+plot_boxplots_comparison_models <- function(x, n_max = 10, dataset_id = NULL, dataset_indices = NULL, model_colors = NULL, ...) {
   if (!requireNamespace("gridExtra", quietly = TRUE)) {
     stop("gridExtra package required for arranging plots")
   }
@@ -1024,18 +1513,18 @@ plot_boxplots_comparison_models <- function(x, n_max = 10, dataset_indices = NUL
   if (n_common < 1) {
     stop("No completed datasets available for model comparison")
   }
+  if (!is.null(dataset_indices)) {
+    if (!is.null(dataset_id)) {
+      stop("Please supply only one of 'dataset_id' or 'dataset_indices'")
+    }
+    dataset_id <- dataset_indices
+  }
 
-  if (is.null(dataset_indices)) {
+  if (is.null(dataset_id)) {
     k <- min(n_max, n_common)
     dataset_indices <- sort(sample(seq_len(n_common), k))
   } else {
-    if (!is.numeric(dataset_indices) || length(dataset_indices) < 1) {
-      stop("dataset_indices must be a non-empty numeric vector")
-    }
-    dataset_indices <- sort(unique(as.integer(dataset_indices)))
-    if (any(dataset_indices < 1) || any(dataset_indices > n_common)) {
-      stop("dataset_indices must be between 1 and ", n_common)
-    }
+    dataset_indices <- validate_dataset_indices(dataset_id, n_common)
   }
 
   all_times <- c()
@@ -1084,9 +1573,12 @@ plot_boxplots_comparison_models <- function(x, n_max = 10, dataset_indices = NUL
   )
 }
 
-#' Plot density comparison across models (single selected dataset)
+#' Plot density comparison across models
 #' @param x bird_model_comparison object
-#' @param dataset_id Dataset index used across all models (NULL for random)
+#' @param dataset_id Dataset selection.
+#'   Can be a single shared index (e.g. `3`), or one index per model
+#'   using a named vector (e.g. `c(weibull = 3, nonparametric = 5)`)
+#'   or unnamed vector in model order.
 #' @param model_colors Optional named/un-named vector of colors for models
 #' @param ... Additional arguments (unused)
 #' @keywords internal
@@ -1101,37 +1593,28 @@ plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = 
   model_names <- x$model_names
   color_map <- resolve_model_colors(model_names, model_colors)
   time_var <- x$time_col
-  status_var <- x$status_col
 
   n_per_model <- vapply(x$model_results, function(res) length(res$imputed_datasets), integer(1))
-  n_common <- min(n_per_model)
-  if (n_common < 1) {
+  if (min(n_per_model) < 1) {
     stop("No completed datasets available for model comparison")
   }
-  if (is.null(dataset_id)) {
-    dataset_id <- sample(seq_len(n_common), 1)
-  }
-  if (!is.numeric(dataset_id) || length(dataset_id) != 1 || dataset_id < 1 || dataset_id > n_common) {
-    stop("dataset_id must be between 1 and ", n_common)
-  }
-  dataset_id <- as.integer(dataset_id)
+  ids_by_model <- resolve_comparison_dataset_ids(
+    dataset_id = dataset_id,
+    keys = model_names,
+    n_by_key = n_per_model,
+    label = "dataset_id"
+  )
 
   selected_times <- c()
   for (nm in model_names) {
-    selected_times <- c(selected_times, x$model_results[[nm]]$imputed_datasets[[dataset_id]][[time_var]])
+    selected_times <- c(selected_times, x$model_results[[nm]]$imputed_datasets[[ids_by_model[[nm]]]][[time_var]])
   }
   selected_times <- selected_times[is.finite(selected_times) & selected_times >= 0]
-  observed_events <- x$original_data[[time_var]][x$original_data[[status_var]] == 1]
-  observed_events <- observed_events[is.finite(observed_events) & observed_events >= 0]
-  if (length(observed_events) < 2) {
-    observed_events <- x$original_data[[time_var]]
-    observed_events <- observed_events[is.finite(observed_events) & observed_events >= 0]
-  }
-  if (length(observed_events) < 2) {
-    stop("Need at least two observed times to compute model density comparison")
+  if (length(selected_times) < 2) {
+    stop("Need at least two selected imputed times to compute model density comparison")
   }
 
-  x_range <- range(c(observed_events, selected_times), finite = TRUE)
+  x_range <- range(selected_times, finite = TRUE)
   x_range[1] <- max(0, x_range[1])
   x_grid <- seq(x_range[1], x_range[2], length.out = 300)
 
@@ -1154,34 +1637,32 @@ plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = 
     stats::approx(dens$x, dens$y, xout = grid, rule = 2)$y
   }
 
-  plot_data <- data.frame(
-    x = x_grid,
-    y = density_on_grid(observed_events, x_grid),
-    curve = "Original",
-    stringsAsFactors = FALSE
-  )
+  plot_data <- data.frame()
   for (nm in model_names) {
-    vals <- x$model_results[[nm]]$imputed_datasets[[dataset_id]][[time_var]]
+    vals <- x$model_results[[nm]]$imputed_datasets[[ids_by_model[[nm]]]][[time_var]]
     vals <- vals[is.finite(vals) & vals >= 0]
     vals <- pmax(vals, .Machine$double.eps)
     if (length(vals) < 2) next
     plot_data <- rbind(plot_data, data.frame(
       x = x_grid,
       y = density_on_grid(vals, x_grid),
-      curve = nm,
+      model = nm,
       stringsAsFactors = FALSE
     ))
   }
 
-  manual_cols <- c("Original" = "black", unname(color_map))
-  names(manual_cols) <- c("Original", names(color_map))
+  sub_txt <- if (length(unique(ids_by_model)) == 1) {
+    paste0("Completed dataset ", as.integer(ids_by_model[[1]]))
+  } else {
+    paste0("Selected datasets: ", paste0(names(ids_by_model), "=", as.integer(ids_by_model), collapse = ", "))
+  }
 
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = curve)) +
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = model)) +
     ggplot2::geom_line(linewidth = 1) +
-    ggplot2::scale_color_manual(values = manual_cols) +
+    ggplot2::scale_color_manual(values = color_map) +
     ggplot2::labs(
       title = "Density Comparison Across Models",
-      subtitle = paste0("Completed dataset ", dataset_id),
+      subtitle = sub_txt,
       x = paste0("Time (", x$model_info$time_unit %||% "days", ")"),
       y = "Density",
       color = NULL
@@ -1196,7 +1677,10 @@ plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = 
 
 #' Plot completed dataset summary for model comparison
 #' @param x bird_model_comparison object
-#' @param dataset_id Dataset index to compare (same index used for all models)
+#' @param dataset_id Dataset selection.
+#'   Can be a single shared index (e.g. `3`), or one index per model
+#'   using a named vector (e.g. `c(weibull = 3, nonparametric = 5)`)
+#'   or unnamed vector in model order.
 #' @param panels Which panels to display. Use `"auto"` for default behaviour
 #'   (full 4-panel for <=2 models; survival+boxplot for >2 models),
 #'   or any combination of `c("hist", "density", "survival", "boxplot")`.
@@ -1221,22 +1705,20 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels =
   n_per_model <- vapply(x$model_results, function(res) {
     length(res$imputed_datasets)
   }, integer(1))
-  n_common <- min(n_per_model)
-  if (n_common < 1) {
+  if (min(n_per_model) < 1) {
     stop("No completed datasets available for model comparison")
   }
 
-  if (is.null(dataset_id)) {
-    dataset_id <- sample(seq_len(n_common), 1)
-  }
-  if (!is.numeric(dataset_id) || dataset_id < 1 || dataset_id > n_common) {
-    stop("dataset_id must be between 1 and ", n_common)
-  }
-  dataset_id <- as.integer(dataset_id)
+  ids_by_model <- resolve_comparison_dataset_ids(
+    dataset_id = dataset_id,
+    keys = model_names,
+    n_by_key = n_per_model,
+    label = "dataset_id"
+  )
 
   model_datasets <- list()
   for (nm in model_names) {
-    d <- x$model_results[[nm]]$imputed_datasets[[dataset_id]]
+    d <- x$model_results[[nm]]$imputed_datasets[[ids_by_model[[nm]]]]
     d$.model <- nm
     model_datasets[[nm]] <- d
   }
@@ -1364,14 +1846,15 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels =
       ggplot2::geom_boxplot(alpha = alpha) +
       ggplot2::scale_fill_manual(values = color_map) +
       ggplot2::labs(title = "Boxplots", x = "Model", y = "Survival Time", fill = "Model")
-    p_boxplot <- style_bird_plot(p_boxplot, base_size = 11)
+    p_boxplot <- style_bird_plot(p_boxplot, legend_position = "none", base_size = 11)
     panel_grobs$boxplot <- p_boxplot
   }
 
   ordered_panels <- panel_grobs[selected_panels]
+  subtitle_map <- paste0(names(ids_by_model), "=", as.integer(ids_by_model), collapse = ", ")
   arrange_completed_summary_panels(
     ordered_panels,
-    paste("Completed Dataset", dataset_id, "Summary - Model Comparison")
+    paste("Completed Dataset Summary - Model Comparison (", subtitle_map, ")", sep = "")
   )
 }
 
@@ -1416,7 +1899,7 @@ survival_step_at_grid <- function(km, grid) {
   out
 }
 
-#' Plot density comparison using logspline
+#' Plot imputed density using logspline
 #' @param x bayesian_imputation object
 #' @param dataset_id Dataset index to use for the imputed density curve (NULL for random)
 #' @param n_curves Deprecated and ignored (kept for backward compatibility)
@@ -1424,7 +1907,7 @@ survival_step_at_grid <- function(km, grid) {
 #' @param ... Additional arguments
 #' @return ggplot object
 #' @keywords internal
-plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha = 0.3, ...) {
+plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha = 0.3, palette = NULL, color = NULL, ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
@@ -1433,6 +1916,8 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
   if (!requireNamespace("logspline", quietly = TRUE)) {
     stop("logspline package required for density comparison")
   }
+
+  palette_map <- resolve_single_plot_palette(palette = palette, color = color, context = "density")
   
   time_var <- x$time_col
   n_datasets <- length(x$imputed_datasets)
@@ -1440,29 +1925,25 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
     stop("No imputed datasets available for density plot")
   }
   
-  if (is.null(dataset_id)) {
-    dataset_id <- sample(seq_len(n_datasets), 1)
+  selected_indices <- validate_dataset_indices(dataset_id, n_datasets)
+  if (is.null(selected_indices)) {
+    selected_indices <- sample(seq_len(n_datasets), 1)
   }
-  if (!is.numeric(dataset_id) || length(dataset_id) != 1 || !is.finite(dataset_id)) {
-    stop("dataset_id must be a single numeric value between 1 and ", n_datasets)
-  }
-  dataset_id <- as.integer(dataset_id)
-  if (dataset_id < 1 || dataset_id > n_datasets) {
-    stop("dataset_id must be between 1 and ", n_datasets)
-  }
-  
-  # Original data density
-  original_data <- x$original_data[x$original_data[[x$status_col]] == 1, ]  # Observed events only
-  if (nrow(original_data) < 2) {
-    stop("Need at least two observed events to compute density plot")
-  }
-  selected_dataset <- x$imputed_datasets[[dataset_id]]
+  selected_indices <- sort(selected_indices)
   
   # Create grid for plotting (stabilised bounds)
-  x_range <- range(
-    c(original_data[[time_var]], selected_dataset[[time_var]]),
-    finite = TRUE
+  all_selected_values <- unlist(
+    lapply(selected_indices, function(i) {
+      vals <- x$imputed_datasets[[i]][[time_var]]
+      vals[is.finite(vals) & vals >= 0]
+    }),
+    use.names = FALSE
   )
+  if (length(all_selected_values) < 2) {
+    stop("Need at least two finite non-negative times to compute density plot")
+  }
+
+  x_range <- range(all_selected_values, finite = TRUE)
   x_range[1] <- max(0, x_range[1])
   x_grid <- seq(x_range[1], x_range[2], length.out = 200)
   
@@ -1483,40 +1964,58 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
     stats::approx(dens$x, dens$y, xout = grid, rule = 2)$y
   }
   
-  # Original density
-  y_orig <- density_on_grid(original_data[[time_var]], x_grid)
-  
-  # Imputed density (single selected dataset)
-  y_imp <- density_on_grid(selected_dataset[[time_var]], x_grid)
-  
-  # Create plot data
-  imputed_label <- paste0("Imputed (dataset ", dataset_id, ")")
-  plot_data <- data.frame(
-    x = rep(x_grid, 2),
-    y = c(y_orig, y_imp),
-    type = rep(c("Original", imputed_label), each = length(x_grid)),
-    stringsAsFactors = FALSE
-  )
+  if (length(selected_indices) == 1) {
+    selected_values <- x$imputed_datasets[[selected_indices]][[time_var]]
+    selected_values <- selected_values[is.finite(selected_values) & selected_values >= 0]
+    y_imp <- density_on_grid(selected_values, x_grid)
+    plot_data <- data.frame(x = x_grid, y = y_imp)
+  } else {
+    plot_data <- do.call(
+      rbind,
+      lapply(selected_indices, function(i) {
+        vals <- x$imputed_datasets[[i]][[time_var]]
+        vals <- vals[is.finite(vals) & vals >= 0]
+        y <- density_on_grid(vals, x_grid)
+        data.frame(
+          x = x_grid,
+          y = y,
+          .dataset = factor(paste("Dataset", i), levels = dataset_labels(selected_indices)),
+          stringsAsFactors = FALSE
+        )
+      })
+    )
+  }
   
   # Create plot 
   time_unit <- x$model_info$time_unit %||% "days"
-  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = type)) +
-    ggplot2::geom_line(linewidth = 0.9) +
-    ggplot2::scale_color_manual(values = stats::setNames(c("black", "#7a7a7a"), c("Original", imputed_label)), name = NULL) +
-    ggplot2::labs(
-      title = NULL,
-      subtitle = NULL,
-      x = paste0("Time (", time_unit, ")"),
-      y = "Density"
-    ) +
-    ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
+  if (length(selected_indices) == 1) {
+    p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y)) +
+      ggplot2::geom_line(linewidth = 1, color = palette_map[["density_line"]]) +
+      ggplot2::labs(
+        title = NULL,
+        subtitle = NULL,
+        x = paste0("Time (", time_unit, ")"),
+        y = "Density"
+      )
+  } else {
+    color_map <- resolve_dataset_colors(selected_indices, color = color)
+    p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = .dataset)) +
+      ggplot2::geom_line(linewidth = 1, alpha = 0.9) +
+      ggplot2::scale_color_manual(values = color_map, name = "Imputed dataset") +
+      ggplot2::labs(
+        title = NULL,
+        subtitle = NULL,
+        x = paste0("Time (", time_unit, ")"),
+        y = "Density"
+      )
+  }
   p <- style_bird_plot(
     p,
-    legend_position = c(0.98, 0.98),
-    legend_justification = c(1, 1),
+    legend_position = if (length(selected_indices) == 1) "none" else c(0.98, 0.98),
     base_size = 13
   ) +
     ggplot2::theme(
+      legend.justification = c(1, 1),
       legend.text = ggplot2::element_text(size = 13),
       axis.text = ggplot2::element_text(size = 13),
       axis.title = ggplot2::element_text(size = 16)
@@ -1865,26 +2364,91 @@ plot_posterior_censored_groups <- function(x, dataset_id = NULL, ...) {
 
 #' Plot density comparison by group (side-by-side panels)
 #' @param x bayesian_imputation_groups object
+#' @param dataset_id Dataset selection.
+#'   Can be a single shared index (e.g. `3`), or one index per group
+#'   using a named vector (e.g. `c(A = 3, B = 5)`)
+#'   or unnamed vector in group order.
+#' @param group_colors Optional colors for groups (named or in group order)
 #' @param n_curves Number of imputed datasets to include (NULL for all)
 #' @param alpha Transparency for CI ribbon in each panel
+#' @param combine_groups For group density plots: whether to overlay groups on one plot (`TRUE`)
+#'   or show separate group panels (`FALSE`).
 #' @param ... Additional arguments passed to plot_density_comparison
 #' @keywords internal
-plot_density_comparison_groups <- function(x, n_curves = NULL, alpha = 0.3, ...) {
+plot_density_comparison_groups <- function(x, dataset_id = NULL, group_colors = NULL, n_curves = NULL, alpha = 0.3,
+                                           combine_groups = TRUE, ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
   }
-  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+  if (!combine_groups && !requireNamespace("gridExtra", quietly = TRUE)) {
     stop("gridExtra package required for arranging plots")
   }
 
-  plot_list <- list()
+  n_by_group <- vapply(x$group_results, function(g) length(g$imputed_datasets), integer(1))
+  group_color_map <- resolve_group_colors(x$group_names, group_colors)
+  ids_by_group <- resolve_comparison_dataset_ids(
+    dataset_id = dataset_id,
+    keys = x$group_names,
+    n_by_key = n_by_group,
+    label = "dataset_id"
+  )
 
+  if (combine_groups) {
+    plot_data <- data.frame()
+    for (group_name in x$group_names) {
+      grp <- x$group_results[[group_name]]
+      p <- plot_density_comparison(
+        grp,
+        dataset_id = ids_by_group[[group_name]],
+        n_curves = n_curves,
+        alpha = alpha,
+        color = group_color_map[[group_name]],
+        ...
+      )
+      d <- p$data
+      if (!all(c("x", "y") %in% names(d))) {
+        next
+      }
+      d$group <- group_name
+      plot_data <- rbind(plot_data, d[, c("x", "y", "group")])
+    }
+
+    subtitle_map <- paste0(names(ids_by_group), "=", as.integer(ids_by_group), collapse = ", ")
+    time_unit <- x$group_results[[1]]$model_info$time_unit %||% "days"
+
+    p_combined <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = group)) +
+      ggplot2::geom_line(linewidth = 1, alpha = alpha) +
+      ggplot2::scale_color_manual(values = group_color_map) +
+      ggplot2::labs(
+        title = "Density Comparison by Group",
+        subtitle = paste0("Selected datasets: ", subtitle_map),
+        x = paste0("Time (", time_unit, ")"),
+        y = "Density",
+        color = NULL
+      )
+    return(style_bird_plot(
+      p_combined,
+      legend_position = c(0.98, 0.98),
+      legend_justification = c(1, 1),
+      base_size = 12
+    ))
+  }
+
+  plot_list <- list()
   for (group_name in x$group_names) {
     grp <- x$group_results[[group_name]]
-    p <- plot_density_comparison(grp, n_curves = n_curves, alpha = alpha, ...)
-    # Make the panel title concise with group name
-    # Minimal title (group only) and dynamic unit handled in child
-    p <- p + ggplot2::labs(title = paste0("Group: ", group_name), subtitle = NULL)
+    p <- plot_density_comparison(
+      grp,
+      dataset_id = ids_by_group[[group_name]],
+      n_curves = n_curves,
+      alpha = alpha,
+      color = group_color_map[[group_name]],
+      ...
+    )
+    p <- p + ggplot2::labs(
+      title = paste0("Group: ", group_name),
+      subtitle = paste0("Dataset ", as.integer(ids_by_group[[group_name]]))
+    )
     plot_list[[group_name]] <- p
   }
 

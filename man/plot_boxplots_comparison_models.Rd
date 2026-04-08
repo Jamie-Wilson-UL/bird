@@ -7,6 +7,7 @@
 plot_boxplots_comparison_models(
   x,
   n_max = 10,
+  dataset_id = NULL,
   dataset_indices = NULL,
   model_colors = NULL,
   ...
@@ -17,7 +18,9 @@ plot_boxplots_comparison_models(
 
 \item{n_max}{Number of datasets to sample (default: 10)}
 
-\item{dataset_indices}{Optional dataset indices to include (shared across models)}
+\item{dataset_id}{Optional dataset ids to include (shared across models)}
+
+\item{dataset_indices}{Deprecated alias for \code{dataset_id}}
 
 \item{model_colors}{Optional named/un-named vector of colors for models}
 

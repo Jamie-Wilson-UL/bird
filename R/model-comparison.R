@@ -225,15 +225,6 @@ print.bird_model_comparison <- function(x, ...) {
   }
   cat("\n")
 
-  cat("NEXT STEPS\n")
-  cat("----------\n")
-  cat("- plot(result)  # Survival comparison across models\n")
-  cat("- plot(result, type = 'completed_dataset_summary')\n")
-  cat("- plot(result, type = 'boxplots_comparison')\n")
-  cat("- plot(result, type = 'density')\n")
-  cat("- complete(result, models = 'combined', dataset = 1)\n")
-  cat("\n")
-
   invisible(x)
 }
 
@@ -243,13 +234,14 @@ print.bird_model_comparison <- function(x, ...) {
 #'   `"survival"`, `"completed_dataset_summary"`, `"boxplots_comparison"`, or `"density"`.
 #' @param ... Additional arguments passed to plotting helpers.
 #'   For `type = "completed_dataset_summary"`, you can pass:
-#'   `dataset_id = <integer>` and
+#'   `dataset_id = <integer>` (shared across models) or a vector
+#'   (named by model or in model order) for per-model selection, and
 #'   `panels = c("hist", "density", "survival", "boxplot")`
 #'   (or `"auto"` for the default layout).
 #'   For `type = "boxplots_comparison"`, you can pass:
-#'   `n_max = <integer>` and/or `dataset_indices = c(...)`.
+#'   `n_max = <integer>` and/or `dataset_id = c(...)`.
 #'   For `type = "density"`, you can pass:
-#'   `dataset_id = <integer>` (random if omitted).
+#'   `dataset_id` in the same way (random shared index if omitted).
 #' @export
 plot.bird_model_comparison <- function(x, type = c("survival", "completed_dataset_summary", "boxplots_comparison", "density"), ...) {
   type <- match.arg(type)

@@ -34,9 +34,15 @@ for \code{type = "boxplots_comparison"}, maximum datasets shown.}
 
 \item{...}{Additional arguments passed to plotting functions.
 For \code{type = "completed_dataset_summary"}, you can pass:
-\verb{dataset_id = <integer>} and
+\verb{dataset_id = <integer>} or a vector for per-group selection, and
 \code{panels = c("hist", "density", "survival", "boxplot")}
-(or \code{"auto"} for the default layout).}
+(or \code{"auto"} for the default layout).
+For \code{type = "density"} and \code{type = "boxplots_comparison"},
+you can also pass \code{dataset_id} similarly.
+For \code{type = "density"}, you can also pass
+\code{group_colors = c(...)} (named or in group order).
+For \code{type = "density"}, \code{combine_groups = TRUE} overlays all groups
+on one plot and \code{combine_groups = FALSE} shows separate group panels.}
 }
 \description{
 Plot method for bayesian_imputation_groups objects

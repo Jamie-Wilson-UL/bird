@@ -6,9 +6,10 @@
 
 It supports:
 - Parametric models (`weibull`, `exponential`, `lognormal`) via Stan
-- Nonparametric LDDP imputation
-- Grouped analyses
+- Nonparametric Linear Dependent Dirichlet Process Mixture Model (via vendored DPpackage)
+- Group comparisons
 - Multi-model comparisons
+- Visualisation options (e.g., densities, historgrams) for completed datasets
 - Export options for completed datasets
 
 ## Installation
@@ -28,12 +29,18 @@ If you plan to use parametric engines, `rstan` is used with package-precompiled 
   - macOS: `xcode-select --install`
   - Linux: `g++` and `make` (e.g. `build-essential`)
 
-## One-Function Workflow
+## One-Function Workflow Example
+
+In the examples below we use the `lung` dataset from the `survival` package
 
 ```r
 library(survival)
 lung <- survival::lung
+```
 
+The `impute()` function provides the default entry point:
+
+```r
 fit <- impute(
   lung,
   time = "time",
@@ -49,43 +56,72 @@ Time units:
 - `time_unit` controls labels/reporting and default time-horizon summaries.
 - Input `time` values are assumed to already be in that unit (no automatic conversion).
 
-`impute()` can also auto-detect common time/status columns. If names are unusual, it is safer to specify them explicitly.
+`impute()` can also attempt to auto-detect common time/status columns if not provided. If names are unusual, it is safer to specify them explicitly.
 
 Switching parametric distributions is just an argument change:
 
 ```r
-fit_weibull <- impute(lung, distribution = "weibull", n_imputations = 5)
-fit_exp     <- impute(lung, distribution = "exponential", n_imputations = 5)
-fit_lognorm <- impute(lung, distribution = "lognormal", n_imputations = 5)
+fit_weibull <- impute(lung, distribution = "weibull", n_imputations = 10)
+fit_exp     <- impute(lung, distribution = "exponential", n_imputations = 10)
+fit_lognorm <- impute(lung, distribution = "lognormal", n_imputations = 10)
 ```
 
 For nonparametric imputation, use the Linear Dependent Dirichlet Process (LDDP) model:
 
 ```r
-fit_np <- impute(lung, model = "nonparametric", n_imputations = 5)
+fit_np <- impute(lung, model = "nonparametric", n_imputations = 10)
 ```
 
 Direct functions are also available: `bayesian_impute()` (parametric) and `bayes_np_impute()` (nonparametric).
 
 ## Looking at Results
 
+To see a summary of the data/imputations:
+
 ```r
 print(fit)
 ```
 
-Plot helpers:
+### Plot helpers
+
+There are multiple plot types available to help visualise and explore the imputations:
 
 ```r
-plot(fit, type = "survival")
-plot(fit, type = "survival", n_curves = 20)
-plot(fit, type = "completed_dataset_summary")
+plot(fit, type = "survival")                    # Survival curves vs KM (max 10 by default, increase with n_curves)
+plot(fit, type = "completed_dataset_summary")   # 4-panel composite (histogram, density, survival, boxplot)
+plot(fit, type = "density")                     # Density curve
+plot(fit, type = "histogram")                   # Histogram
+plot(fit, type = "boxplot")                     # Boxplot
+plot(fit, type = "boxplots_comparison")         # Compares boxplots of completed datasets (max 10 by default, increase with n_max)
+```
+Random imputations are shown unless specified. For most plots, you can use `dataset_id` to specify and compare specific imputations:
+
+```r
+plot(fit, type = "survival", dataset_id = 3)           # one specific imputed dataset
+plot(fit, type = "survival", dataset_id = c(3, 7, 10)) # compare selected imputed datasets
 plot(fit, type = "completed_dataset_summary", dataset_id = 3)
-plot(fit, type = "completed_dataset_summary", dataset_id = 3, panels = c("hist", "density", "boxplot"))
-plot(fit, type = "boxplots_comparison")
-plot(fit, type = "boxplots_comparison", n_max = 20)
-plot(fit, type = "boxplots_comparison", dataset_indices = c(1, 5, 10))
-plot(fit, type = "density")                           # one random imputed dataset
-plot(fit, type = "density", dataset_id = 3)           # choose a specific imputed dataset
+plot(fit, type = "completed_dataset_summary", dataset_id = c(3, 7, 10))
+plot(fit, type = "histogram", dataset_id = 3)         
+plot(fit, type = "histogram", dataset_id = c(3, 7, 10))
+plot(fit, type = "density", dataset_id = 3)           
+plot(fit, type = "density", dataset_id = c(3, 7, 10))
+plot(fit, type = "boxplots_comparison", dataset_id = c(1, 5, 10))
+```
+
+You can also customise the plot colours if desired:
+
+```r
+plot(fit, type = "density", dataset_id = 3, color = "green")
+plot(fit, type = "histogram", dataset_id = 3, color = "blue")
+plot(fit, type = "survival", dataset_id = 3, color = "red")
+
+# multiple colors for multiple selected imputations
+plot(
+  fit,
+  type = "density",
+  dataset_id = c(3, 7, 10),
+  color = c("green", "orange", "purple")
+)
 ```
 
 Diagnostics:
@@ -109,21 +145,30 @@ fit_grp <- impute(
 )
 ```
 
-Grouped fits use the same plotting API:
+Grouped fits use the same ideas:
 
 ```r
 print(fit_grp)
 plot(fit_grp, type = "survival")
 plot(fit_grp, type = "completed_dataset_summary")
-plot(fit_grp, type = "completed_dataset_summary", panels = c("survival", "boxplot", "density"))
-plot(fit_grp, type = "survival", combine_groups = FALSE)
-plot(fit_grp, type = "boxplots_comparison")
+plot(fit_grp, type = "completed_dataset_summary", dataset_id = c(3, 5))  # per-group IDs by group order
+plot(fit_grp, type = "density", dataset_id = c(3, 5), group_colors = c("green", "orange"))
+plot(fit_grp, type = "density", dataset_id = c(3, 5), combine_groups = FALSE)  # separate panels
+
+# named mapping (avoids relying on group order)
+plot(fit_grp, type = "density",
+     dataset_id = setNames(c(3, 5), fit_grp$group_names),
+     group_colors = setNames(c("green", "orange"), fit_grp$group_names))
 ```
 
 For `plot(fit_grp, type = "completed_dataset_summary")`:
-- 2 groups: full 4-panel view (histogram, density, survival, boxplot)
+- 2 groups: full 4-panel view (histogram, density, survival, boxplot) by default
 - For greater than 2 groups: simplified view (survival + boxplot) to avoid clutter
-- You can override defaults with e.g., `panels = c("hist", "density", "boxplot")`. Valid panel names are "hist", "density", "survival", "boxplot"
+- You can override defaults with e.g., `panels = c("histogram", "density", "boxplot")`. Valid panel names are "histogram", "density", "survival", "boxplot"
+
+```r
+plot(fit, type = "completed_dataset_summary", dataset_id = 3, panels = c("histogram", "density", "boxplot"))
+```
 
 ### 3-Group Example
 
@@ -153,6 +198,8 @@ plot(fit_grp3, type = "completed_dataset_summary", panels = c("survival", "boxpl
 
 ## Comparing Multiple Models
 
+It is also possible to fit and compare the imputations from multiple models:
+
 ```r
 cmp <- compare_models(
   lung,
@@ -160,13 +207,22 @@ cmp <- compare_models(
   n_imputations = 5
 )
 
+# Usual plots/customisations still work as before
 print(cmp)
 plot(cmp, type = "survival")
 plot(cmp, type = "completed_dataset_summary")
+plot(cmp, type = "completed_dataset_summary",
+     dataset_id = c(weibull = 3, nonparametric = 5))
 plot(cmp, type = "completed_dataset_summary", panels = c("hist", "survival", "boxplot"))
 plot(cmp, type = "boxplots_comparison")
 plot(cmp, type = "density")                 
 plot(cmp, type = "density", dataset_id = 3) 
+plot(cmp, type = "density",
+     dataset_id = c(weibull = 3, nonparametric = 5),
+     model_colors = c(weibull = "green", nonparametric = "orange"))
+plot(cmp, type = "completed_dataset_summary",
+     dataset_id = c(weibull = 3, nonparametric = 5),
+     model_colors = c(weibull = "green", nonparametric = "orange"))
 ```
 
 Accepted `models` values include:
@@ -175,13 +231,6 @@ Accepted `models` values include:
 - `"lognormal"`
 - `"nonparametric"` (aliases `"np"`, `"lddp"`)
 
-Completed datasets can be extracted combined or per model:
-
-```r
-combined <- complete(cmp, dataset = 1, models = "combined")
-separate <- complete(cmp, dataset = 1, models = "separate")
-weibull_only <- complete(cmp, dataset = 1, models = "weibull")
-```
 
 ## Working with Completed Datasets
 
@@ -198,6 +247,14 @@ For grouped analyses:
 ```r
 combined <- complete(fit_grp, dataset = 1, groups = "combined")
 separate <- complete(fit_grp, dataset = 1, groups = "separate")
+```
+
+Completed datasets can be extracted combined or per model:
+
+```r
+combined <- complete(cmp, dataset = 1, models = "combined")
+separate <- complete(cmp, dataset = 1, models = "separate")
+weibull_only <- complete(cmp, dataset = 1, models = "weibull")
 ```
 
 ## Exporting
@@ -217,6 +274,8 @@ Current export formats are CSV and RDS.
 When exporting multiple datasets to RDS, set `combine = FALSE` to write one file per dataset.
 
 ## Advanced Usage
+
+It is possible to specify custom priors:
 
 ```r
 my_priors <- get_default_priors("weibull")
@@ -253,17 +312,6 @@ Nonparametric runs accept `mcmc = list(nburn = ..., nsave = ..., nskip = ...)` i
 - MCMC diagnostics: inspect `plot(fit, type = "trace")`, then increase iterations if needed.
 - Performance: use fewer imputations or a faster distribution (`"exponential"`).
 - Reusing draws: use `generate_complete_datasets()` instead of refitting.
-
-Quick data sanity check:
-
-```r
-stopifnot(
-  all(lung$time > 0),
-  all(lung$status %in% c(0, 1)),
-  !any(is.na(lung$time)),
-  !any(is.na(lung$status))
-)
-```
 
 ## Summary
 

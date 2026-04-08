@@ -18,13 +18,14 @@
 
 \item{...}{Additional arguments passed to plotting helpers.
 For \code{type = "completed_dataset_summary"}, you can pass:
-\verb{dataset_id = <integer>} and
+\verb{dataset_id = <integer>} (shared across models) or a vector
+(named by model or in model order) for per-model selection, and
 \code{panels = c("hist", "density", "survival", "boxplot")}
 (or \code{"auto"} for the default layout).
 For \code{type = "boxplots_comparison"}, you can pass:
-\verb{n_max = <integer>} and/or \code{dataset_indices = c(...)}.
+\verb{n_max = <integer>} and/or \code{dataset_id = c(...)}.
 For \code{type = "density"}, you can pass:
-\verb{dataset_id = <integer>} (random if omitted).}
+\code{dataset_id} in the same way (random shared index if omitted).}
 }
 \description{
 Plot method for model comparison objects

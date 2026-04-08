@@ -4,14 +4,32 @@
 \alias{plot_density_comparison_groups}
 \title{Plot density comparison by group (side-by-side panels)}
 \usage{
-plot_density_comparison_groups(x, n_curves = NULL, alpha = 0.3, ...)
+plot_density_comparison_groups(
+  x,
+  dataset_id = NULL,
+  group_colors = NULL,
+  n_curves = NULL,
+  alpha = 0.3,
+  combine_groups = TRUE,
+  ...
+)
 }
 \arguments{
 \item{x}{bayesian_imputation_groups object}
 
+\item{dataset_id}{Dataset selection.
+Can be a single shared index (e.g. \code{3}), or one index per group
+using a named vector (e.g. \code{c(A = 3, B = 5)})
+or unnamed vector in group order.}
+
+\item{group_colors}{Optional colors for groups (named or in group order)}
+
 \item{n_curves}{Number of imputed datasets to include (NULL for all)}
 
 \item{alpha}{Transparency for CI ribbon in each panel}
+
+\item{combine_groups}{For group density plots: whether to overlay groups on one plot (\code{TRUE})
+or show separate group panels (\code{FALSE}).}
 
 \item{...}{Additional arguments passed to plot_density_comparison}
 }

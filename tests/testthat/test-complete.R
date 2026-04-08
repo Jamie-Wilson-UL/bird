@@ -192,3 +192,56 @@ test_that("complete() works with different format arguments", {
   expect_true(is.data.frame(result_long))
   expect_true(".imp" %in% names(result_long))
 }) 
+
+test_that("grouped complete() honors dataset selection for combined long/list output", {
+  make_group_member <- function(shift = 0) {
+    original <- data.frame(time = c(10, 20), status = c(1L, 0L))
+    d1 <- data.frame(
+      time = c(10, 24 + shift),
+      original_time = c(10, 20),
+      original_status = c(1L, 0L),
+      status = c(1L, 1L),
+      was_censored = c(FALSE, TRUE),
+      dataset_id = 1L
+    )
+    d2 <- data.frame(
+      time = c(10, 28 + shift),
+      original_time = c(10, 20),
+      original_status = c(1L, 0L),
+      status = c(1L, 1L),
+      was_censored = c(FALSE, TRUE),
+      dataset_id = 2L
+    )
+    structure(list(
+      original_data = original,
+      time_col = "time",
+      status_col = "status",
+      imputed_datasets = list(d1, d2)
+    ), class = "bayesian_imputation")
+  }
+
+  grp <- structure(
+    list(
+      group_names = c("A", "B"),
+      group_results = list(A = make_group_member(0), B = make_group_member(3)),
+      group_errors = list(),
+      groups = "grp"
+    ),
+    class = c("bayesian_imputation_groups", "bayesian_imputation")
+  )
+
+  res_long <- complete(grp, dataset = 1, format = "long", groups = "combined")
+  expect_true(is.data.frame(res_long))
+  expect_equal(unique(res_long$.imp), 1)
+
+  res_list <- complete(grp, dataset = 2, format = "list", groups = "combined")
+  expect_true(is.list(res_list))
+  expect_equal(names(res_list), "dataset_2")
+  expect_true(".imp" %in% names(res_list[[1]]))
+  expect_equal(unique(res_list[[1]]$.imp), 2)
+
+  expect_error(
+    complete(grp, dataset = c(1, 2), format = "wide", groups = "combined"),
+    "single dataset index"
+  )
+})

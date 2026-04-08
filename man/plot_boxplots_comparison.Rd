@@ -4,14 +4,24 @@
 \alias{plot_boxplots_comparison}
 \title{Plot boxplots comparison of all completed datasets}
 \usage{
-plot_boxplots_comparison(x, n_max = 10, dataset_indices = NULL, ...)
+plot_boxplots_comparison(
+  x,
+  n_max = 10,
+  dataset_id = NULL,
+  dataset_indices = NULL,
+  palette = NULL,
+  color = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{bayesian_imputation object}
 
 \item{n_max}{Number of datasets to sample for boxplots (default: 10)}
 
-\item{dataset_indices}{Optional indices of datasets to include (random if NULL)}
+\item{dataset_id}{Optional dataset ids to include (random if NULL)}
+
+\item{dataset_indices}{Deprecated alias for \code{dataset_id}}
 }
 \value{
 ggplot object

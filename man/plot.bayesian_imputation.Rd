@@ -11,13 +11,17 @@
   alpha = 0.3,
   show_original = TRUE,
   n_max = NULL,
+  color = NULL,
+  palette = NULL,
   ...
 )
 }
 \arguments{
 \item{x}{A bayesian_imputation object}
 
-\item{type}{Type of plot: "survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density"}
+\item{type}{Type of plot: "survival", "histogram"
+(alias "hist"), "boxplot" (alias "box"), "trace", "pairs", "posterior",
+"completed_dataset_summary", "boxplots_comparison", "density"}
 
 \item{n_curves}{For survival plots: number of imputed curves to display (default: 10)}
 
@@ -29,10 +33,20 @@
 for \code{type = "survival"}, treated as \code{n_curves};
 for \code{type = "boxplots_comparison"}, maximum datasets shown.}
 
+\item{color}{Optional single-color override for the active plot.
+This is a simple alternative to \code{palette} when you just want one color.}
+
+\item{palette}{Optional named color overrides for single-model plots.
+Supported names include:
+\code{"km"}, \code{"imputed"}, \code{"hist_fill"}, \code{"density_line"},
+\code{"density_fill"}, \code{"survival_curve"}, \code{"box_fill"}, \code{"boxplots_fill"}.}
+
 \item{...}{Additional arguments passed to plotting functions.
-For \code{type = "completed_dataset_summary"} and \code{type = "density"},
-you can pass \verb{dataset_id = <integer>} to select a specific imputed dataset
-(random if omitted).
+For \code{type = "survival"}, \code{type = "completed_dataset_summary"},
+\code{type = "histogram"}/\code{"hist"}, \code{type = "boxplot"}/\code{"box"},
+\code{type = "density"}, and \code{type = "boxplots_comparison"},
+you can pass \verb{dataset_id = <integer>} or \code{dataset_id = c(...)}
+to select one or more specific imputed datasets (random if omitted).
 For \code{type = "completed_dataset_summary"}, you can also pass
 \code{panels = c("hist", "density", "survival", "boxplot")}
 (or \code{"auto"} for the default layout).}

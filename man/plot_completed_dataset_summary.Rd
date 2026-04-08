@@ -4,7 +4,14 @@
 \alias{plot_completed_dataset_summary}
 \title{Plot completed dataset summary panels}
 \usage{
-plot_completed_dataset_summary(x, dataset_id = NULL, panels = "auto", ...)
+plot_completed_dataset_summary(
+  x,
+  dataset_id = NULL,
+  panels = "auto",
+  palette = NULL,
+  color = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{bayesian_imputation object}

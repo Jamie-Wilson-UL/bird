@@ -16,7 +16,10 @@ plot_completed_dataset_summary_groups(
 \arguments{
 \item{x}{bayesian_imputation_groups object}
 
-\item{dataset_id}{Dataset ID to plot (NULL for random)}
+\item{dataset_id}{Dataset selection.
+Can be a single shared index (e.g. \code{3}), or one index per group
+using a named vector (e.g. \code{c(A = 3, B = 5)})
+or unnamed vector in group order.}
 
 \item{panels}{Which panels to display. Use \code{"auto"} for default behaviour
 (full 4-panel for <=2 groups; survival+boxplot for >2 groups),

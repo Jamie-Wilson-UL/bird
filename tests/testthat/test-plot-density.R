@@ -24,7 +24,12 @@ test_that("plot_density_comparison supports dataset_id selection", {
   
   p <- plot.bayesian_imputation(mock_object, type = "density", dataset_id = 3)
   expect_s3_class(p, "ggplot")
-  expect_true(any(grepl("Imputed \\(dataset 3\\)", p$data$type)))
+  expect_true(all(c("x", "y") %in% names(p$data)))
+  expect_false("type" %in% names(p$data))
+
+  p_multi <- plot.bayesian_imputation(mock_object, type = "density", dataset_id = c(1, 3))
+  expect_s3_class(p_multi, "ggplot")
+  expect_true(".dataset" %in% names(p_multi$data))
 })
 
 test_that("plot_density_comparison validates dataset_id", {
@@ -54,5 +59,9 @@ test_that("plot_density_comparison validates dataset_id", {
   expect_error(
     plot.bayesian_imputation(mock_object, type = "density", dataset_id = 3),
     "dataset_id must be between 1 and 2"
+  )
+  expect_error(
+    plot.bayesian_imputation(mock_object, type = "density", dataset_id = c(1, 1.2)),
+    "dataset_id values must be integers"
   )
 })
