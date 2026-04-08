@@ -13,7 +13,7 @@ It supports:
 - Nonparametric Linear Dependent Dirichlet Process Mixture Model (via vendored DPpackage)
 - Group comparisons
 - Multi-model comparisons
-- Visualisation options (e.g., densities, historgrams) for completed datasets
+- Visualisation options (e.g., densities, histograms) for completed datasets
 - Export options for completed datasets
 
 ## Installation
