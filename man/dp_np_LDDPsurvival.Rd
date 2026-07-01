@@ -14,9 +14,9 @@ The object returned by the internal \code{LDDPsurvival()} call (class
 \code{LDDPsurvival}).
 }
 \description{
-Wrapper that exposes the vendored \code{LDDPsurvival()} function.
-All arguments, return value and behaviour are identical to the original function
-from \strong{DPpackage}; we only forward the call.
+Internal wrapper for the vendored \code{LDDPsurvival()} function.
+All arguments, return value and behaviour are identical to the original
+function from \strong{DPpackage}; we only forward the call.
 }
 \examples{
 # Not run: see bayes_np_impute() for a full example.
@@ -24,8 +24,7 @@ from \strong{DPpackage}; we only forward the call.
 
 }
 \seealso{
-Internally calls \code{\link[=LDDPsurvival.default]{LDDPsurvival.default()}}.  A higher-level helper
-\code{\link[=bayes_np_impute]{bayes_np_impute()}} provides user-friendly data
-handling.
+Internally calls \code{\link[=LDDPsurvival.default]{LDDPsurvival.default()}}. A higher-level helper
+\code{\link[=bayes_np_impute]{bayes_np_impute()}} provides user-friendly data handling.
 }
 \keyword{internal}

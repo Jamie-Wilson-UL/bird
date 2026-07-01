@@ -25,7 +25,7 @@ Convenience function for quick export of imputed datasets.
 }
 \examples{
 \dontrun{
-result <- bayesian_impute(data, n_imputations = 5)
+result <- bayesian_impute(data, time_col = "time", status_col = "status", n_imputations = 5)
 quick_export(result, "my_imputed_data")
 }
 

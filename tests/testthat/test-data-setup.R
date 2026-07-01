@@ -1,35 +1,26 @@
 # Tests for data setup functions (prepare_survival_data, quick_impute, etc.)
 
-test_that("prepare_survival_data auto-detects standard column names", {
-  # Test data with standard column names
+test_that("prepare_survival_data requires explicit column names", {
   test_data <- data.frame(
     time = c(10, 15, 20, 25, 30),
     status = c(1, 0, 1, 0, 1),
     age = c(50, 60, 45, 70, 55)
   )
-  
-  result <- prepare_survival_data(test_data, verbose = FALSE)
-  
+
+  expect_error(
+    prepare_survival_data(test_data, verbose = FALSE),
+    "Please specify both 'time' and 'status'; auto-detection is not yet supported",
+    fixed = TRUE
+  )
+
+  result <- prepare_survival_data(test_data, time = "time", status = "status", verbose = FALSE)
+
   expect_s3_class(result, "survival_data")
   expect_equal(attr(result, "time_col"), "time")
   expect_equal(attr(result, "status_col"), "status") 
   expect_equal(attr(result, "n_total"), 5)
   expect_equal(attr(result, "n_censored"), 2)
   expect_equal(attr(result, "censoring_rate"), 0.4)
-})
-
-test_that("prepare_survival_data detects alternative column names", {
-  # Test data with alternative column names
-  test_data <- data.frame(
-    duration = c(10, 15, 20),
-    event = c(1, 0, 1),
-    covariate = c(1, 2, 3)
-  )
-  
-  result <- prepare_survival_data(test_data, verbose = FALSE)
-  
-  expect_equal(attr(result, "time_col"), "duration")
-  expect_equal(attr(result, "status_col"), "event")
 })
 
 test_that("prepare_survival_data handles manual specification", {
@@ -47,6 +38,37 @@ test_that("prepare_survival_data handles manual specification", {
   
   expect_equal(attr(result, "time_col"), "follow_up_days")
   expect_equal(attr(result, "status_col"), "died")
+})
+
+test_that("public imputation entry points require explicit columns for raw data", {
+  test_data <- data.frame(
+    time = c(10, 15, 20, 25, 30),
+    status = c(1, 0, 1, 0, 1)
+  )
+
+  expect_error(
+    impute(test_data, verbose = FALSE),
+    "Please specify both 'time' and 'status'; auto-detection is not yet supported",
+    fixed = TRUE
+  )
+
+  expect_error(
+    bayesian_impute(test_data, verbose = FALSE),
+    "Please specify both 'time_col' and 'status_col'; auto-detection is not yet supported",
+    fixed = TRUE
+  )
+
+  expect_error(
+    bayes_np_impute(test_data, verbose = FALSE),
+    "Please specify both 'time_col' and 'status_col'; auto-detection is not yet supported",
+    fixed = TRUE
+  )
+
+  expect_error(
+    compare_models(test_data, models = c("weibull", "exponential"), verbose = FALSE),
+    "Please specify both 'time' and 'status'; auto-detection is not yet supported",
+    fixed = TRUE
+  )
 })
 
 test_that("prepare_survival_data validates input data", {
@@ -70,7 +92,8 @@ test_that("prepare_survival_data validates input data", {
   
   expect_error(
     prepare_survival_data(test_data, verbose = FALSE),
-    "Could not detect survival data columns"
+    "Please specify both 'time' and 'status'; auto-detection is not yet supported",
+    fixed = TRUE
   )
 })
 
@@ -93,44 +116,13 @@ test_that("prepare_survival_data handles missing column specifications", {
   )
 })
 
-test_that("detect_survival_column works correctly", {
-  test_data <- data.frame(
-    duration = c(10, 20),
-    vital_status = c(1, 0),
-    treatment = c("A", "B")
-  )
-  
-  # Test exact match detection
-  time_col <- detect_survival_column(test_data, c("duration", "time"), "time")
-  expect_equal(time_col, "duration")
-  
-  # Test partial match detection
-  status_col <- detect_survival_column(test_data, c("status", "vital"), "status")
-  expect_equal(status_col, "vital_status")
-  
-  # Test no match
-  no_match <- detect_survival_column(test_data, c("missing"), "time")
-  expect_null(no_match)
-})
-
-test_that("detect_survival_column detects binary columns for status", {
-  test_data <- data.frame(
-    time_var = c(10, 20, 30),
-    binary_col = c(0, 1, 0),  # Should be detected as status column
-    other_col = c(1, 2, 3)
-  )
-  
-  status_col <- detect_survival_column(test_data, c("status"), "status")
-  expect_equal(status_col, "binary_col")
-})
-
 test_that("bayesian_impute.survival_data method works", {
   test_data <- data.frame(
     time = c(10, 15, 20),
     status = c(1, 0, 1) 
   )
   
-  survival_data <- prepare_survival_data(test_data, verbose = FALSE)
+  survival_data <- prepare_survival_data(test_data, time = "time", status = "status", verbose = FALSE)
   
   # Mock the default method to avoid Stan compilation 
   expect_no_error({
@@ -146,7 +138,7 @@ test_that("print.survival_data works correctly", {
     status = c(1, 0, 1, 0)
   )
   
-  survival_data <- prepare_survival_data(test_data, verbose = FALSE)
+  survival_data <- prepare_survival_data(test_data, time = "time", status = "status", verbose = FALSE)
   
   # Capture printed output
   output <- capture.output(print(survival_data))
@@ -168,7 +160,7 @@ test_that("quick_impute provides one-liner functionality", {
   expect_no_error({
     # This would normally be: result <- quick_impute(test_data, n_imputations = 2)
     # For testing, we verify the data preparation step works
-    prepared <- prepare_survival_data(test_data, verbose = FALSE)
+    prepared <- prepare_survival_data(test_data, time = "time", status = "status", verbose = FALSE)
     expect_true(inherits(prepared, "survival_data"))
   })
 })
@@ -195,13 +187,13 @@ test_that("prepare_survival_data respects validation settings", {
   
   # With validation enabled (default), should error
   expect_error(
-    prepare_survival_data(test_data, verbose = FALSE),
+    prepare_survival_data(test_data, time = "time", status = "status", verbose = FALSE),
     "All survival times must be positive"
   )
   
   # With validation disabled, should work (though data is invalid)
   expect_no_error({
-    result <- prepare_survival_data(test_data, validate = FALSE, verbose = FALSE)
+    result <- prepare_survival_data(test_data, time = "time", status = "status", validate = FALSE, verbose = FALSE)
     expect_s3_class(result, "survival_data")
   })
 }) 

@@ -65,7 +65,7 @@ complete <- function(object, ...) {
 #' }
 #'
 #' @details
-#' This function provides an intuitive interface for extracting completed datasets,
+#' This function provides an interface for extracting completed datasets,
 #' eliminating the need for the more complex `generate_complete_datasets()` function
 #' for simple use cases.
 #'
@@ -163,7 +163,7 @@ complete.bayesian_imputation <- function(object,
     dataset_numbers <- c(0, dataset_numbers)
   }
 
-  # Standardize user-facing output:
+  # Standardise user-facing output:
   # - drop survival_data class/attrs
   # - rename internal time columns to `time` (original) + `imputed_time`
   selected_datasets <- lapply(selected_datasets, function(d) {

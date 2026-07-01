@@ -13,57 +13,65 @@ namespace model_weibull_imputation_namespace {
 using stan::model::model_base_crtp;
 using namespace stan::math;
 stan::math::profile_map profiles__;
-static constexpr std::array<const char*, 50> locations_array__ =
+static constexpr std::array<const char*, 58> locations_array__ =
   {" (found before start of program)",
-  " (in 'weibull_imputation', line 22, column 2 to column 45)",
-  " (in 'weibull_imputation', line 23, column 2 to column 45)",
-  " (in 'weibull_imputation', line 35, column 2 to column 36)",
-  " (in 'weibull_imputation', line 37, column 2 to column 24)",
-  " (in 'weibull_imputation', line 38, column 2 to column 25)",
-  " (in 'weibull_imputation', line 40, column 2 to column 59)",
-  " (in 'weibull_imputation', line 41, column 2 to column 60)",
-  " (in 'weibull_imputation', line 42, column 2 to column 50)",
-  " (in 'weibull_imputation', line 44, column 22 to column 74)",
-  " (in 'weibull_imputation', line 44, column 2 to column 74)",
-  " (in 'weibull_imputation', line 45, column 22 to column 75)",
-  " (in 'weibull_imputation', line 45, column 2 to column 75)",
-  " (in 'weibull_imputation', line 48, column 4 to column 33)",
-  " (in 'weibull_imputation', line 49, column 4 to column 59)",
-  " (in 'weibull_imputation', line 50, column 26 to column 37)",
-  " (in 'weibull_imputation', line 50, column 4 to column 37)",
-  " (in 'weibull_imputation', line 51, column 26 to column 41)",
-  " (in 'weibull_imputation', line 51, column 4 to column 41)",
-  " (in 'weibull_imputation', line 52, column 4 to column 33)",
-  " (in 'weibull_imputation', line 53, column 26 to column 36)",
-  " (in 'weibull_imputation', line 53, column 4 to column 36)",
-  " (in 'weibull_imputation', line 54, column 26 to column 40)",
-  " (in 'weibull_imputation', line 54, column 4 to column 40)",
-  " (in 'weibull_imputation', line 56, column 4 to column 31)",
-  " (in 'weibull_imputation', line 57, column 4 to column 35)",
-  " (in 'weibull_imputation', line 58, column 4 to column 54)",
-  " (in 'weibull_imputation', line 61, column 6 to column 45)",
-  " (in 'weibull_imputation', line 60, column 4 to line 61, column 45)",
-  " (in 'weibull_imputation', line 47, column 22 to line 62, column 3)",
-  " (in 'weibull_imputation', line 47, column 2 to line 62, column 3)",
-  " (in 'weibull_imputation', line 27, column 2 to column 48)",
-  " (in 'weibull_imputation', line 28, column 2 to column 48)",
-  " (in 'weibull_imputation', line 30, column 2 to column 48)",
-  " (in 'weibull_imputation', line 31, column 2 to column 49)",
+  " (in 'weibull_imputation', line 27, column 2 to column 45)",
+  " (in 'weibull_imputation', line 28, column 2 to column 45)",
+  " (in 'weibull_imputation', line 45, column 2 to column 36)",
+  " (in 'weibull_imputation', line 47, column 2 to column 24)",
+  " (in 'weibull_imputation', line 48, column 2 to column 25)",
+  " (in 'weibull_imputation', line 50, column 2 to column 59)",
+  " (in 'weibull_imputation', line 51, column 2 to column 60)",
+  " (in 'weibull_imputation', line 52, column 2 to column 50)",
+  " (in 'weibull_imputation', line 54, column 22 to column 74)",
+  " (in 'weibull_imputation', line 54, column 2 to column 74)",
+  " (in 'weibull_imputation', line 55, column 22 to column 75)",
+  " (in 'weibull_imputation', line 55, column 2 to column 75)",
+  " (in 'weibull_imputation', line 58, column 4 to column 33)",
+  " (in 'weibull_imputation', line 59, column 4 to column 59)",
+  " (in 'weibull_imputation', line 60, column 26 to column 37)",
+  " (in 'weibull_imputation', line 60, column 4 to column 37)",
+  " (in 'weibull_imputation', line 61, column 26 to column 41)",
+  " (in 'weibull_imputation', line 61, column 4 to column 41)",
+  " (in 'weibull_imputation', line 62, column 4 to column 33)",
+  " (in 'weibull_imputation', line 63, column 26 to column 36)",
+  " (in 'weibull_imputation', line 63, column 4 to column 36)",
+  " (in 'weibull_imputation', line 64, column 26 to column 40)",
+  " (in 'weibull_imputation', line 64, column 4 to column 40)",
+  " (in 'weibull_imputation', line 66, column 4 to column 31)",
+  " (in 'weibull_imputation', line 67, column 4 to column 35)",
+  " (in 'weibull_imputation', line 68, column 4 to column 54)",
+  " (in 'weibull_imputation', line 71, column 6 to column 45)",
+  " (in 'weibull_imputation', line 70, column 4 to line 71, column 45)",
+  " (in 'weibull_imputation', line 57, column 22 to line 72, column 3)",
+  " (in 'weibull_imputation', line 57, column 2 to line 72, column 3)",
+  " (in 'weibull_imputation', line 36, column 4 to column 50)",
+  " (in 'weibull_imputation', line 37, column 4 to column 50)",
+  " (in 'weibull_imputation', line 35, column 9 to line 38, column 3)",
+  " (in 'weibull_imputation', line 33, column 4 to column 50)",
+  " (in 'weibull_imputation', line 34, column 4 to column 55)",
+  " (in 'weibull_imputation', line 32, column 25 to line 35, column 3)",
+  " (in 'weibull_imputation', line 32, column 2 to line 38, column 3)",
+  " (in 'weibull_imputation', line 40, column 2 to column 48)",
+  " (in 'weibull_imputation', line 41, column 2 to column 49)",
   " (in 'weibull_imputation', line 5, column 2 to column 21)",
   " (in 'weibull_imputation', line 6, column 2 to column 22)",
   " (in 'weibull_imputation', line 8, column 18 to column 23)",
   " (in 'weibull_imputation', line 8, column 2 to column 32)",
   " (in 'weibull_imputation', line 9, column 18 to column 24)",
   " (in 'weibull_imputation', line 9, column 2 to column 33)",
-  " (in 'weibull_imputation', line 12, column 2 to column 29)",
-  " (in 'weibull_imputation', line 13, column 2 to column 29)",
-  " (in 'weibull_imputation', line 14, column 2 to column 29)",
-  " (in 'weibull_imputation', line 15, column 2 to column 29)",
-  " (in 'weibull_imputation', line 17, column 2 to column 31)",
-  " (in 'weibull_imputation', line 18, column 2 to column 31)",
-  " (in 'weibull_imputation', line 35, column 18 to column 24)",
-  " (in 'weibull_imputation', line 37, column 9 to column 14)",
-  " (in 'weibull_imputation', line 38, column 9 to column 15)"};
+  " (in 'weibull_imputation', line 11, column 2 to column 37)",
+  " (in 'weibull_imputation', line 13, column 2 to column 34)",
+  " (in 'weibull_imputation', line 14, column 2 to column 33)",
+  " (in 'weibull_imputation', line 17, column 2 to column 29)",
+  " (in 'weibull_imputation', line 18, column 2 to column 29)",
+  " (in 'weibull_imputation', line 19, column 2 to column 29)",
+  " (in 'weibull_imputation', line 20, column 2 to column 29)",
+  " (in 'weibull_imputation', line 22, column 2 to column 31)",
+  " (in 'weibull_imputation', line 23, column 2 to column 31)",
+  " (in 'weibull_imputation', line 45, column 18 to column 24)",
+  " (in 'weibull_imputation', line 47, column 9 to column 14)",
+  " (in 'weibull_imputation', line 48, column 9 to column 15)"};
 #include <stan_meta_header.hpp>
 class model_weibull_imputation final : public model_base_crtp<model_weibull_imputation> {
 private:
@@ -71,6 +79,9 @@ private:
   int n_cens;
   Eigen::Matrix<double,-1,1> t_obs_data__;
   Eigen::Matrix<double,-1,1> t_cens_data__;
+  int prior_family;
+  double scale_prior_shape;
+  double scale_prior_rate;
   double mu_log_shape;
   double sd_log_shape;
   double mu_log_scale;
@@ -100,25 +111,25 @@ public:
     try {
       int pos__ = std::numeric_limits<int>::min();
       pos__ = 1;
-      current_statement__ = 35;
+      current_statement__ = 40;
       context__.validate_dims("data initialization", "n_obs", "int",
         std::vector<size_t>{});
       n_obs = std::numeric_limits<int>::min();
-      current_statement__ = 35;
+      current_statement__ = 40;
       n_obs = context__.vals_i("n_obs")[(1 - 1)];
-      current_statement__ = 35;
+      current_statement__ = 40;
       stan::math::check_greater_or_equal(function__, "n_obs", n_obs, 0);
-      current_statement__ = 36;
+      current_statement__ = 41;
       context__.validate_dims("data initialization", "n_cens", "int",
         std::vector<size_t>{});
       n_cens = std::numeric_limits<int>::min();
-      current_statement__ = 36;
+      current_statement__ = 41;
       n_cens = context__.vals_i("n_cens")[(1 - 1)];
-      current_statement__ = 36;
+      current_statement__ = 41;
       stan::math::check_greater_or_equal(function__, "n_cens", n_cens, 0);
-      current_statement__ = 37;
+      current_statement__ = 42;
       stan::math::validate_non_negative_index("t_obs", "n_obs", n_obs);
-      current_statement__ = 38;
+      current_statement__ = 43;
       context__.validate_dims("data initialization", "t_obs", "double",
         std::vector<size_t>{static_cast<size_t>(n_obs)});
       t_obs_data__ = Eigen::Matrix<double,-1,1>::Constant(n_obs,
@@ -127,24 +138,24 @@ public:
         Eigen::Map<Eigen::Matrix<double,-1,1>>(t_obs_data__.data(), n_obs);
       {
         std::vector<local_scalar_t__> t_obs_flat__;
-        current_statement__ = 38;
+        current_statement__ = 43;
         t_obs_flat__ = context__.vals_r("t_obs");
-        current_statement__ = 38;
+        current_statement__ = 43;
         pos__ = 1;
-        current_statement__ = 38;
+        current_statement__ = 43;
         for (int sym1__ = 1; sym1__ <= n_obs; ++sym1__) {
-          current_statement__ = 38;
+          current_statement__ = 43;
           stan::model::assign(t_obs, t_obs_flat__[(pos__ - 1)],
             "assigning variable t_obs", stan::model::index_uni(sym1__));
-          current_statement__ = 38;
+          current_statement__ = 43;
           pos__ = (pos__ + 1);
         }
       }
-      current_statement__ = 38;
+      current_statement__ = 43;
       stan::math::check_greater_or_equal(function__, "t_obs", t_obs, 0);
-      current_statement__ = 39;
+      current_statement__ = 44;
       stan::math::validate_non_negative_index("t_cens", "n_cens", n_cens);
-      current_statement__ = 40;
+      current_statement__ = 45;
       context__.validate_dims("data initialization", "t_cens", "double",
         std::vector<size_t>{static_cast<size_t>(n_cens)});
       t_cens_data__ = Eigen::Matrix<double,-1,1>::Constant(n_cens,
@@ -153,74 +164,104 @@ public:
         Eigen::Map<Eigen::Matrix<double,-1,1>>(t_cens_data__.data(), n_cens);
       {
         std::vector<local_scalar_t__> t_cens_flat__;
-        current_statement__ = 40;
+        current_statement__ = 45;
         t_cens_flat__ = context__.vals_r("t_cens");
-        current_statement__ = 40;
+        current_statement__ = 45;
         pos__ = 1;
-        current_statement__ = 40;
+        current_statement__ = 45;
         for (int sym1__ = 1; sym1__ <= n_cens; ++sym1__) {
-          current_statement__ = 40;
+          current_statement__ = 45;
           stan::model::assign(t_cens, t_cens_flat__[(pos__ - 1)],
             "assigning variable t_cens", stan::model::index_uni(sym1__));
-          current_statement__ = 40;
+          current_statement__ = 45;
           pos__ = (pos__ + 1);
         }
       }
-      current_statement__ = 40;
+      current_statement__ = 45;
       stan::math::check_greater_or_equal(function__, "t_cens", t_cens, 0);
-      current_statement__ = 41;
+      current_statement__ = 46;
+      context__.validate_dims("data initialization", "prior_family", "int",
+        std::vector<size_t>{});
+      prior_family = std::numeric_limits<int>::min();
+      current_statement__ = 46;
+      prior_family = context__.vals_i("prior_family")[(1 - 1)];
+      current_statement__ = 46;
+      stan::math::check_greater_or_equal(function__, "prior_family",
+        prior_family, 1);
+      current_statement__ = 46;
+      stan::math::check_less_or_equal(function__, "prior_family",
+        prior_family, 2);
+      current_statement__ = 47;
+      context__.validate_dims("data initialization", "scale_prior_shape",
+        "double", std::vector<size_t>{});
+      scale_prior_shape = std::numeric_limits<double>::quiet_NaN();
+      current_statement__ = 47;
+      scale_prior_shape = context__.vals_r("scale_prior_shape")[(1 - 1)];
+      current_statement__ = 47;
+      stan::math::check_greater_or_equal(function__, "scale_prior_shape",
+        scale_prior_shape, 0);
+      current_statement__ = 48;
+      context__.validate_dims("data initialization", "scale_prior_rate",
+        "double", std::vector<size_t>{});
+      scale_prior_rate = std::numeric_limits<double>::quiet_NaN();
+      current_statement__ = 48;
+      scale_prior_rate = context__.vals_r("scale_prior_rate")[(1 - 1)];
+      current_statement__ = 48;
+      stan::math::check_greater_or_equal(function__, "scale_prior_rate",
+        scale_prior_rate, 0);
+      current_statement__ = 49;
       context__.validate_dims("data initialization", "mu_log_shape",
         "double", std::vector<size_t>{});
       mu_log_shape = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 41;
+      current_statement__ = 49;
       mu_log_shape = context__.vals_r("mu_log_shape")[(1 - 1)];
-      current_statement__ = 42;
+      current_statement__ = 50;
       context__.validate_dims("data initialization", "sd_log_shape",
         "double", std::vector<size_t>{});
       sd_log_shape = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 42;
+      current_statement__ = 50;
       sd_log_shape = context__.vals_r("sd_log_shape")[(1 - 1)];
-      current_statement__ = 42;
+      current_statement__ = 50;
       stan::math::check_greater_or_equal(function__, "sd_log_shape",
         sd_log_shape, 0);
-      current_statement__ = 43;
+      current_statement__ = 51;
       context__.validate_dims("data initialization", "mu_log_scale",
         "double", std::vector<size_t>{});
       mu_log_scale = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 43;
+      current_statement__ = 51;
       mu_log_scale = context__.vals_r("mu_log_scale")[(1 - 1)];
-      current_statement__ = 44;
+      current_statement__ = 52;
       context__.validate_dims("data initialization", "sd_log_scale",
         "double", std::vector<size_t>{});
       sd_log_scale = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 44;
+      current_statement__ = 52;
       sd_log_scale = context__.vals_r("sd_log_scale")[(1 - 1)];
-      current_statement__ = 44;
+      current_statement__ = 52;
       stan::math::check_greater_or_equal(function__, "sd_log_scale",
         sd_log_scale, 0);
-      current_statement__ = 45;
+      current_statement__ = 53;
       context__.validate_dims("data initialization", "shape_upper", "double",
         std::vector<size_t>{});
       shape_upper = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 45;
+      current_statement__ = 53;
       shape_upper = context__.vals_r("shape_upper")[(1 - 1)];
-      current_statement__ = 45;
+      current_statement__ = 53;
       stan::math::check_greater_or_equal(function__, "shape_upper",
         shape_upper, 1e-8);
-      current_statement__ = 46;
+      current_statement__ = 54;
       context__.validate_dims("data initialization", "scale_upper", "double",
         std::vector<size_t>{});
       scale_upper = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 46;
+      current_statement__ = 54;
       scale_upper = context__.vals_r("scale_upper")[(1 - 1)];
-      current_statement__ = 46;
+      current_statement__ = 54;
       stan::math::check_greater_or_equal(function__, "scale_upper",
         scale_upper, 1e-8);
-      current_statement__ = 47;
+      current_statement__ = 55;
       stan::math::validate_non_negative_index("t_imputed", "n_cens", n_cens);
-      current_statement__ = 48;
+      current_statement__ = 56;
       stan::math::validate_non_negative_index("ll_obs", "n_obs", n_obs);
-      current_statement__ = 49;
+      current_statement__ = 57;
       stan::math::validate_non_negative_index("ll_cens", "n_cens", n_cens);
     } catch (const std::exception& e) {
       stan::lang::rethrow_located(e, locations_array__[current_statement__]);
@@ -263,15 +304,25 @@ public:
       scale = in__.template read_constrain_lub<local_scalar_t__,
                 jacobian__>(1e-12, scale_upper, lp__);
       {
-        current_statement__ = 31;
-        lp_accum__.add(stan::math::lognormal_lpdf<propto__>(shape,
-                         mu_log_shape, sd_log_shape));
-        current_statement__ = 32;
-        lp_accum__.add(stan::math::lognormal_lpdf<propto__>(scale,
-                         mu_log_scale, sd_log_scale));
-        current_statement__ = 33;
+        current_statement__ = 37;
+        if (stan::math::logical_eq(prior_family, 1)) {
+          current_statement__ = 34;
+          lp_accum__.add(stan::math::lognormal_lpdf<propto__>(shape,
+                           mu_log_shape, sd_log_shape));
+          current_statement__ = 35;
+          lp_accum__.add(stan::math::gamma_lpdf<propto__>(scale,
+                           scale_prior_shape, scale_prior_rate));
+        } else {
+          current_statement__ = 31;
+          lp_accum__.add(stan::math::lognormal_lpdf<propto__>(shape,
+                           mu_log_shape, sd_log_shape));
+          current_statement__ = 32;
+          lp_accum__.add(stan::math::lognormal_lpdf<propto__>(scale,
+                           mu_log_scale, sd_log_scale));
+        }
+        current_statement__ = 38;
         lp_accum__.add(stan::math::weibull_lpdf<false>(t_obs, shape, scale));
-        current_statement__ = 34;
+        current_statement__ = 39;
         lp_accum__.add(stan::math::weibull_lccdf(t_cens, shape, scale));
       }
     } catch (const std::exception& e) {

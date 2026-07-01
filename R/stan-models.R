@@ -161,17 +161,29 @@ stan_models_ready <- function() {
 }
 
 #' Get default priors for a given distribution
+#'
+#' For Weibull models, the default prior family uses a lognormal prior for
+#' `shape` and a Gamma prior for `scale`. The returned list also includes
+#' lognormal scale-prior fields so users can set `prior_family = "lognormal"`
+#' for sensitivity runs.
+#'
 #' @param distribution Distribution name ("weibull", "exponential", "lognormal")
 #' @return List of default prior parameters
 #' @export
 get_default_priors <- function(distribution = "weibull") {
   switch(distribution,
     "weibull" = list(
-      # Log-parameterisation defaults 
-      mu_log_shape = 0,           # centered at shape ~ 1
-      sd_log_shape = 1.0,         # weakly-informative on log-shape
-      mu_log_scale = 0,           # unit-agnostic location
-      sd_log_scale = 2.0          # weakly-informative on log-scale
+      # Published-method-compatible mixed default:
+      # lognormal shape prior and Gamma scale prior.
+      prior_family = "gamma_scale",
+      scale_prior_shape = 1.0,
+      scale_prior_rate = 1.0,
+      mu_log_shape = 0,
+      sd_log_shape = 1.0,
+      # Retain lognormal scale fields so users can switch family without
+      # rebuilding a prior object from scratch.
+      mu_log_scale = 0,
+      sd_log_scale = 2.0
     ),
     "exponential" = list(
       # Rate parameter (gamma) weak prior centered near 1
@@ -189,12 +201,23 @@ get_default_priors <- function(distribution = "weibull") {
   )
 }
 
+normalize_weibull_priors <- function(priors) {
+  default_priors <- get_default_priors("weibull")
+  missing_prior_names <- setdiff(names(default_priors), names(priors))
+  if (length(missing_prior_names) > 0) {
+    priors[missing_prior_names] <- default_priors[missing_prior_names]
+  }
+  priors
+}
+
 #' Compute data-adaptive priors from observed events
 #'
 #' Adaptive Weibull priors use the dispersion of log-times to set a rough center
 #' for log-shape via a Gumbel approximation (sd(log T) ~= pi/(alpha*sqrt(6))), and
 #' center log-scale to match the observed median using the relation
-#' median = scale * (log 2)^(1/shape).
+#' median = scale * (log 2)^(1/shape). By default the shape prior remains
+#' lognormal, while the scale center and spread are converted into Gamma prior
+#' hyperparameters by matching the implied lognormal mean and variance.
 #'
 #' @param distribution Distribution name
 #' @param t_obs Numeric vector of observed event times (>0)
@@ -232,7 +255,17 @@ get_adaptive_priors <- function(distribution = "weibull", t_obs) {
       sd_log_scale <- max(sd_log_scale, 1.0)
     }
 
+    gamma_from_lognormal <- function(mu, sigma) {
+      mean_x <- exp(mu + 0.5 * sigma^2)
+      var_x <- (exp(sigma^2) - 1) * exp(2 * mu + sigma^2)
+      list(shape = mean_x^2 / var_x, rate = mean_x / var_x)
+    }
+    scale_gamma <- gamma_from_lognormal(mu_log_scale, sd_log_scale)
+
     list(
+      prior_family = "gamma_scale",
+      scale_prior_shape = scale_gamma$shape,
+      scale_prior_rate = scale_gamma$rate,
       mu_log_shape = mu_log_shape,
       sd_log_shape = sd_log_shape,
       mu_log_scale = mu_log_scale,

@@ -140,6 +140,31 @@ test_that("group completed summary accepts per-group dataset ids", {
   expect_s3_class(g, "gtable")
 })
 
+test_that("group completed summary handles groups with uneven completed columns", {
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("survival")
+  skip_if_not_installed("gridExtra")
+
+  fit_grp <- make_mock_group_object()
+  fit_grp$group_names <- c("A", "B")
+  fit_grp$group_results <- fit_grp$group_results[c("A", "B")]
+
+  # Mimic a legacy/no-censoring group that lacks imputation metadata columns.
+  fit_grp$group_results$A$imputed_datasets[[1]]$original_time <- fit_grp$group_results$A$original_data$time
+  fit_grp$group_results$A$imputed_datasets[[1]]$original_status <- fit_grp$group_results$A$original_data$status
+  fit_grp$group_results$A$imputed_datasets[[1]]$was_censored <- fit_grp$group_results$A$original_data$status == 0
+  fit_grp$group_results$B$imputed_datasets[[1]] <- fit_grp$group_results$B$imputed_datasets[[1]][, c("time", "status"), drop = FALSE]
+
+  g <- plot.bayesian_imputation_groups(
+    fit_grp,
+    type = "completed_dataset_summary",
+    dataset_id = 1,
+    panels = c("hist", "survival", "boxplot")
+  )
+
+  expect_s3_class(g, "gtable")
+})
+
 test_that("group density accepts per-group dataset ids", {
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("gridExtra")
@@ -152,6 +177,7 @@ test_that("group density accepts per-group dataset ids", {
     dataset_id = c(A = 1, B = 2, C = 1)
   )
   expect_s3_class(g, "ggplot")
+  expect_equal(g$layers[[1]]$aes_params$alpha, 0.9)
 
   g2 <- plot.bayesian_imputation_groups(
     fit_grp,
@@ -160,6 +186,16 @@ test_that("group density accepts per-group dataset ids", {
     group_colors = c(A = "#1b9e77", B = "#d95f02", C = "#7570b3")
   )
   expect_s3_class(g2, "ggplot")
+  expect_equal(g2$layers[[1]]$aes_params$alpha, 0.9)
+
+  g2_custom_alpha <- plot.bayesian_imputation_groups(
+    fit_grp,
+    type = "density",
+    dataset_id = c(A = 1, B = 2, C = 1),
+    alpha = 0.4
+  )
+  expect_s3_class(g2_custom_alpha, "ggplot")
+  expect_equal(g2_custom_alpha$layers[[1]]$aes_params$alpha, 0.4)
 
   g3 <- plot.bayesian_imputation_groups(
     fit_grp,
@@ -264,6 +300,7 @@ test_that("model comparison supports density type", {
     dataset_id = 1
   )
   expect_s3_class(p, "ggplot")
+  expect_equal(p$layers[[1]]$aes_params$alpha, 0.9)
 
   p2 <- plot.bird_model_comparison(
     cmp,
@@ -271,5 +308,15 @@ test_that("model comparison supports density type", {
     dataset_id = c(weibull = 1, lognormal = 2, nonparametric = 1)
   )
   expect_s3_class(p2, "ggplot")
+  expect_equal(p2$layers[[1]]$aes_params$alpha, 0.9)
+
+  p3 <- plot.bird_model_comparison(
+    cmp,
+    type = "density",
+    dataset_id = c(weibull = 1, lognormal = 2, nonparametric = 1),
+    alpha = 0.35
+  )
+  expect_s3_class(p3, "ggplot")
+  expect_equal(p3$layers[[1]]$aes_params$alpha, 0.35)
 
 })

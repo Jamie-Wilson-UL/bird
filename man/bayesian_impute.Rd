@@ -20,9 +20,9 @@ bayesian_impute(
 \arguments{
 \item{data}{A data frame containing survival data}
 
-\item{time_col}{Name of the time column}
+\item{time_col}{Name of the time column. Required unless \code{data} is a \code{survival_data} object.}
 
-\item{status_col}{Name of the status column (1 = event, 0 = censored)}
+\item{status_col}{Name of the status column (1 = event, 0 = censored). Required unless \code{data} is a \code{survival_data} object.}
 
 \item{groups}{Name of the group variable for group comparison (optional)}
 
@@ -32,7 +32,7 @@ bayesian_impute(
 
 \item{priors}{List of prior parameters for the distribution parameters}
 
-\item{mcmc_options}{List of MCMC sampling options (chains, iterations, etc.)}
+\item{mcmc_options}{List of MCMC sampling options (chains, iterations etc.)}
 
 \item{verbose}{Print progress messages (default: TRUE)}
 

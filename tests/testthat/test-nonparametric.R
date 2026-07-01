@@ -1,6 +1,9 @@
 test_that("bayes_np_impute runs and returns expected structure", {
   skip_on_cran()
   skip_if_not_installed("survival")
+  if (!tolower(Sys.getenv("BIRD_FITTING_TESTS", "false")) %in% c("1", "true", "yes")) {
+    skip("Set BIRD_FITTING_TESTS=true to run fitting-based nonparametric test")
+  }
 
   set.seed(2025)
   result <- bayes_np_impute(

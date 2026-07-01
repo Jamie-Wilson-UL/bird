@@ -60,20 +60,20 @@ Time units:
 - `time_unit` controls labels/reporting and default time-horizon summaries.
 - Input `time` values are assumed to already be in that unit (no automatic conversion).
 
-`impute()` can also attempt to auto-detect common time/status columns if not provided. If names are unusual, it is safer to specify them explicitly.
+You must specify `time` and `status` when passing a raw data frame. Auto-detection is not yet supported because guessing survival columns can silently select the wrong variables.
 
 Switching parametric distributions is just an argument change:
 
 ```r
-fit_weibull <- impute(lung, distribution = "weibull", n_imputations = 10)
-fit_exp     <- impute(lung, distribution = "exponential", n_imputations = 10)
-fit_lognorm <- impute(lung, distribution = "lognormal", n_imputations = 10)
+fit_weibull <- impute(lung, time = "time", status = "status", distribution = "weibull", n_imputations = 10)
+fit_exp     <- impute(lung, time = "time", status = "status", distribution = "exponential", n_imputations = 10)
+fit_lognorm <- impute(lung, time = "time", status = "status", distribution = "lognormal", n_imputations = 10)
 ```
 
 For nonparametric imputation, use the Linear Dependent Dirichlet Process (LDDP) model:
 
 ```r
-fit_np <- impute(lung, model = "nonparametric", n_imputations = 10)
+fit_np <- impute(lung, time = "time", status = "status", model = "nonparametric", n_imputations = 10)
 ```
 
 Direct functions are also available: `bayesian_impute()` (parametric) and `bayes_np_impute()` (nonparametric).
@@ -98,11 +98,12 @@ plot(fit, type = "histogram")                   # Histogram
 plot(fit, type = "boxplot")                     # Boxplot
 plot(fit, type = "boxplots_comparison")         # Compares boxplots of completed datasets (max 10 by default, increase with n_max)
 ```
-Random imputations are shown unless specified. For most plots, you can use `dataset_id` to specify and compare specific imputations:
+Completed-dataset plots use dataset 1 by default. Plots that overlay several imputed datasets, such as survival curves and boxplot comparisons, sample a limited set unless specific `dataset_id` values are supplied. For most plots, you can use `dataset_id` to specify and compare specific imputations:
 
 ```r
 plot(fit, type = "survival", dataset_id = 3)           # one specific imputed dataset
 plot(fit, type = "survival", dataset_id = c(3, 7, 10)) # compare selected imputed datasets
+plot(fit, type = "survival", dataset_id = 3, show_median = TRUE) # add dotted median guide lines
 plot(fit, type = "completed_dataset_summary", dataset_id = 3)
 plot(fit, type = "completed_dataset_summary", dataset_id = c(3, 7, 10))
 plot(fit, type = "histogram", dataset_id = 3)         
@@ -143,6 +144,8 @@ Grouped analyses are fitted by setting `groups = ...`:
 ```r
 fit_grp <- impute(
   lung,
+  time = "time",
+  status = "status",
   groups = "sex",
   distribution = "weibull",
   n_imputations = 10
@@ -187,6 +190,8 @@ lung3$age_group <- cut(
 
 fit_grp3 <- impute(
   lung3,
+  time = "time",
+  status = "status",
   groups = "age_group",
   distribution = "weibull",
   n_imputations = 5,
@@ -207,6 +212,8 @@ It is also possible to fit and compare the imputations from multiple models:
 ```r
 cmp <- compare_models(
   lung,
+  time = "time",
+  status = "status",
   models = c("weibull", "nonparametric"),
   n_imputations = 5
 )
@@ -283,10 +290,10 @@ It is possible to specify custom priors:
 
 ```r
 my_priors <- get_default_priors("weibull")
-my_priors$mu_log_shape <- 0.2
-my_priors$sd_log_shape <- 0.4
-my_priors$mu_log_scale <- 0.5
-my_priors$sd_log_scale <- 0.3
+my_priors$mu_log_shape <- log(1.5)
+my_priors$sd_log_shape <- 0.5
+my_priors$scale_prior_shape <- 3
+my_priors$scale_prior_rate <- 0.02
 
 custom_fit <- impute(
   lung,
@@ -305,6 +312,8 @@ custom_fit <- impute(
   verbose = TRUE
 )
 ```
+
+For a lognormal-prior sensitivity run, set `my_priors$prior_family <- "lognormal"` and adjust `mu_log_shape`, `sd_log_shape`, `mu_log_scale` and `sd_log_scale`.
 
 You can do the same for other distributions (`get_default_priors("lognormal")`, etc.).
 Nonparametric runs accept `mcmc = list(nburn = ..., nsave = ..., nskip = ...)` in the same way.

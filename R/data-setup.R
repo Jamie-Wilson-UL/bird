@@ -1,46 +1,35 @@
-# Smart Data Setup for Survival Analysis
+# Data Setup for Survival Analysis
 # Functions to prepare survival data for Bayesian imputation
 
 #' Prepare Survival Data for Bayesian Imputation
 #'
 #' This function prepares survival data for use with bayesian_impute().
-#' It can auto-detect time and status columns, validate the data format and create
-#' a properly formatted survival dataset object.
+#' It validates explicitly specified time and status columns and creates a
+#' properly formatted survival dataset object.
 #'
-#' @param data A data.frame containing survival data
-#' @param time Column name or index for survival times. If NULL, attempts auto-detection
-#'   using common survival analysis column names.
-#' @param status Column name or index for event status (1=event, 0=censored). 
-#'   If NULL, attempts auto-detection.
-#' @param auto_detect Logical; whether to attempt automatic column detection (default: TRUE)
+#' @param data A data frame containing survival data
+#' @param time Column name or index for survival times.
+#' @param status Column name or index for event status (1=event, 0=censored).
 #' @param validate Logical; whether to run data validation (default: TRUE)
-#' @param verbose Logical; print information about detected columns (default: TRUE)
+#' @param verbose Logical; print validation information (default: TRUE)
 #' @param time_unit Character string describing the unit used for time values (default "days")
 #'
-#' @return A survival_data object (enhanced data.frame) ready for bayesian_impute()
+#' @return A survival_data object ready for bayesian_impute()
 #'
 #' @details
-#' The function attempts to automatically detect survival data columns using common
-#' naming conventions:
-#' 
-#' **Time columns**: "time", "duration", "followup", "survival_time", "days", 
-#' "months", "years", "event_time", "tte"
-#' 
-#' **Status columns**: "status", "event", "died", "death", "censored", "outcome", 
-#' "vital_status", "event_indicator"
-#' 
+#' Automatic column detection is not yet supported. Users must specify both
+#' `time` and `status` so the package does not guess the wrong columns.
+#'
 #' The resulting object retains all original columns but adds metadata about
 #' which columns represent time and status for use by bayesian_impute().
 #'
 #' @examples
 #' \dontrun{
-#' # Auto-detection (recommended for beginners)
 #' library(survival)
-#' lung_data <- prepare_survival_data(lung)
-#' 
-#' # Manual specification  
+#' lung_data <- prepare_survival_data(lung, time = "time", status = "status")
+#'
 #' my_data <- prepare_survival_data(mydata, time = "duration", status = "died")
-#' 
+#'
 #' # Then use directly with bayesian_impute
 #' result <- bayesian_impute(lung_data, n_imputations = 20)
 #' }
@@ -48,9 +37,8 @@
 #' @seealso \code{\link{bayesian_impute}}, \code{\link{validate_survival_data}}
 #' @export
 prepare_survival_data <- function(data, 
-                                 time = NULL, 
-                                 status = NULL,
-                                 auto_detect = TRUE,
+                                 time,
+                                 status,
                                  validate = TRUE,
                                  verbose = TRUE,
                                  time_unit = "days") {
@@ -63,35 +51,8 @@ prepare_survival_data <- function(data,
     stop("Data cannot be empty")
   }
   
-  # Auto-detect time column if not specified
-  if (is.null(time) && auto_detect) {
-    time_candidates <- c("time", "duration", "followup", "survival_time", 
-                        "days", "months", "years", "event_time", "tte",
-                        "futime", "surv_time", "survival")
-    
-    time <- detect_survival_column(data, time_candidates, "time")
-    
-    if (verbose && !is.null(time)) {
-      message("Auto-detected time column: '", time, "'")
-    }
-  }
-  
-  # Auto-detect status column if not specified  
-  if (is.null(status) && auto_detect) {
-    status_candidates <- c("status", "event", "died", "death", "censored", 
-                          "outcome", "vital_status", "event_indicator",
-                          "cens", "delta", "observed")
-    
-    status <- detect_survival_column(data, status_candidates, "status")
-    
-    if (verbose && !is.null(status)) {
-      message("Auto-detected status column: '", status, "'")
-    }
-  }
-  
-  # Check that we have both time and status
-  if (is.null(time) || is.null(status)) {
-    stop("Could not detect survival data columns. Please specify 'time' and 'status' manually.\n",
+  if (missing(time) || missing(status) || is.null(time) || is.null(status)) {
+    stop("Please specify both 'time' and 'status'; auto-detection is not yet supported.\n",
          "Available columns: ", paste(names(data), collapse = ", "))
   }
   
@@ -113,7 +74,7 @@ prepare_survival_data <- function(data,
   
   # Run validation if requested
   if (validate) {
-    validation_result <- validate_survival_data(data, time, status)
+    validation_result <- validate_survival_data(data, time, status, verbose = verbose)
     data <- validation_result$data  # Use the potentially converted data
   }
   
@@ -140,96 +101,6 @@ prepare_survival_data <- function(data,
   }
   
   return(result)
-}
-
-#' Detect Survival Analysis Columns
-#'
-#' Helper function to automatically detect time or status columns in survival data
-#' based on common naming conventions.
-#'
-#' @param data Data.frame to search
-#' @param candidates Character vector of candidate column names to search for
-#' @param col_type Type of column being detected ("time" or "status") for error messages
-#'
-#' @return Character name of detected column, or NULL if none found
-#' @keywords internal
-detect_survival_column <- function(data, candidates, col_type) {
-  
-  # Check for exact matches first (case-insensitive)
-  col_names_lower <- tolower(names(data))
-  candidates_lower <- tolower(candidates)
-  
-  for (candidate in candidates_lower) {
-    matches <- which(col_names_lower == candidate)
-    if (length(matches) > 0) {
-      return(names(data)[matches[1]])  # Return first match
-    }
-  }
-  
-  # Check for partial matches (contains the candidate)
-  for (candidate in candidates_lower) {
-    matches <- which(grepl(candidate, col_names_lower, fixed = TRUE))
-    if (length(matches) > 0) {
-      return(names(data)[matches[1]])  # Return first match
-    }
-  }
-  
-  # If this is a status column, also check for numeric patterns with smart prioritisation
-  if (col_type == "status") {
-    # Get all binary columns (0/1 and 1/2 coding)
-    binary_01_cols <- sapply(data, function(x) is.numeric(x) && all(x %in% c(0, 1, NA)))
-    binary_12_cols <- sapply(data, function(x) is.numeric(x) && all(x %in% c(1, 2, NA)))
-    
-    binary_cols <- names(data)[binary_01_cols | binary_12_cols]
-    
-    if (length(binary_cols) > 0) {
-      # Score each binary column based on how likely it is to be a status variable
-      status_scores <- sapply(binary_cols, function(col) {
-        score <- 0
-        col_lower <- tolower(col)
-        
-        # High priority: clear status/event indicators
-        if (grepl("status|event|outcome|death|died|censored", col_lower)) score <- score + 10
-        if (grepl("response|failure|survival|recurrence", col_lower)) score <- score + 8
-        if (grepl("progression|relapse|remission", col_lower)) score <- score + 8
-        
-        # Medium priority: could be status
-        if (grepl("indicator|flag|binary|dichotomous", col_lower)) score <- score + 5
-        if (grepl("yes|no|present|absent", col_lower)) score <- score + 3
-        
-        # Low priority: likely not status variables
-        if (grepl("sex|gender|male|female", col_lower)) score <- score - 15
-        if (grepl("group|treatment|arm|cohort|study", col_lower)) score <- score - 12
-        if (grepl("smoking|alcohol|drug|medication", col_lower)) score <- score - 10
-        if (grepl("age|bmi|weight|height", col_lower)) score <- score - 8
-        if (grepl("race|ethnicity|education", col_lower)) score <- score - 8
-        if (grepl("stage|grade|score|index", col_lower)) score <- score - 5
-        
-        # Very low priority: definitely not status
-        if (grepl("id|patient|subject|sample", col_lower)) score <- score - 20
-        if (grepl("date|time|duration|follow", col_lower)) score <- score - 20
-        
-        return(score)
-      })
-      
-      # Return the highest scoring column
-      best_col <- binary_cols[which.max(status_scores)]
-      best_score <- max(status_scores)
-      
-      # Only return if the score is reasonable (not too negative)
-      if (best_score >= -5) {
-        return(best_col)
-      } else {
-        # If all scores are too low, return the first binary column but warn
-        warning("Multiple binary columns found but none clearly identified as status. ",
-                "Using '", binary_cols[1], "' as status column. ",
-                "Consider specifying status column manually.")
-        return(binary_cols[1])
-      }
-    }
-  }
-  
-  return(NULL)
 }
 
 
@@ -261,7 +132,8 @@ print.survival_data <- function(x, ...) {
 #' @param n_imputations Number of imputed datasets (default: 10)
 #' @param distribution Survival distribution to use (default: "weibull")
 #' @param time_unit Label describing the time unit to display (default "days")
-#' @param ... Additional arguments passed to `bayesian_impute()`
+#' @param ... Additional arguments passed to `impute()`. For raw data, this
+#'   must include `time` and `status`.
 #'
 #' @return bayesian_imputation object
 #' @export

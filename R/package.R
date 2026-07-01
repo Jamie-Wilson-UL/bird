@@ -1,33 +1,10 @@
-#' @useDynLib bird, .registration = TRUE
-#' @keywords internal
-"_PACKAGE"
-
-## usethis namespace: start
-#' @importFrom rlang .data
-#' @importFrom stats median quantile as.formula density
-#' @importFrom utils head
-#' @importFrom graphics plot
-#' @importFrom survival survreg Surv
-#' @importFrom stats aggregate coefficients model.matrix model.response na.fail optimize plnorm rexp rlnorm runif rweibull sd setNames ts uniroot vcov
-#' @importFrom graphics axis hist layout lines par polygon segments
-#' @importFrom methods is
-#' @import methods
-#' @importFrom gridExtra grid.arrange
-#' @importFrom haven write_dta write_sav
-#' @importFrom scales percent
-#' @import Rcpp
-#' @importFrom rstan sampling
-#' @importFrom rstantools rstan_config
-#' @importFrom RcppParallel RcppParallelLibs
-## usethis namespace: end
-
 # Global variables for ggplot2 NSE
 utils::globalVariables(
   c(
     "time", "survival", "type", "dataset_id", "density", "imputed_time",
     "dataset", "group", "y", "ymin", "ymax", "imputed_time_draw",
     "xintercept", "line_type", "lower", "upper", "x_start", "y_start",
-    "x_end", "y_end", "legend_label",
+    "x_end", "y_end", "legend_label", ".dataset", "dataset_label",
     ".model", ".time", "model", "surv_mean", "surv_q025", "surv_q975"
   )
 )
@@ -71,7 +48,6 @@ NULL
 #'   \item Unlimited dataset generation by sampling from stored posterior distributions
 #'   \item Comprehensive visualisations: survival curves, density plots, posterior plots, trace plots, pairs plots
 #'   \item MCMC convergence diagnostics and validation
-#'   \item Simulation framework with realistic censoring patterns (exponential and uniform)
 #'   \item Posterior diagnostics for censored observations and posterior draws
 #' }
 #' 
@@ -99,5 +75,21 @@ NULL
 #' Imputation of Censored Survival Data. Stats, 5(1), 89-107. 
 #' doi:10.3390/stats5010006
 #'
+#' @useDynLib bird, .registration = TRUE
+#' @importFrom rlang .data
+#' @importFrom stats median quantile as.formula density
+#' @importFrom utils head
+#' @importFrom graphics plot
+#' @importFrom survival survreg Surv
+#' @importFrom stats aggregate coefficients model.matrix model.response na.fail plnorm sd setNames ts vcov
+#' @importFrom graphics axis hist layout lines par polygon segments
+#' @importFrom methods is
+#' @import methods
+#' @importFrom gridExtra grid.arrange
+#' @importFrom scales percent
+#' @import Rcpp
+#' @importFrom rstan sampling
+#' @importFrom rstantools rstan_config
+#' @importFrom RcppParallel RcppParallelLibs
 #' @keywords internal
-"_PACKAGE" 
+"_PACKAGE"

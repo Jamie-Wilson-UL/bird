@@ -6,59 +6,46 @@
 \usage{
 prepare_survival_data(
   data,
-  time = NULL,
-  status = NULL,
-  auto_detect = TRUE,
+  time,
+  status,
   validate = TRUE,
   verbose = TRUE,
   time_unit = "days"
 )
 }
 \arguments{
-\item{data}{A data.frame containing survival data}
+\item{data}{A data frame containing survival data}
 
-\item{time}{Column name or index for survival times. If NULL, attempts auto-detection
-using common survival analysis column names.}
+\item{time}{Column name or index for survival times.}
 
-\item{status}{Column name or index for event status (1=event, 0=censored).
-If NULL, attempts auto-detection.}
-
-\item{auto_detect}{Logical; whether to attempt automatic column detection (default: TRUE)}
+\item{status}{Column name or index for event status (1=event, 0=censored).}
 
 \item{validate}{Logical; whether to run data validation (default: TRUE)}
 
-\item{verbose}{Logical; print information about detected columns (default: TRUE)}
+\item{verbose}{Logical; print validation information (default: TRUE)}
 
 \item{time_unit}{Character string describing the unit used for time values (default "days")}
 }
 \value{
-A survival_data object (enhanced data.frame) ready for bayesian_impute()
+A survival_data object ready for bayesian_impute()
 }
 \description{
 This function prepares survival data for use with bayesian_impute().
-It can auto-detect time and status columns, validate the data format and create
-a properly formatted survival dataset object.
+It validates explicitly specified time and status columns and creates a
+properly formatted survival dataset object.
 }
 \details{
-The function attempts to automatically detect survival data columns using common
-naming conventions:
-
-\strong{Time columns}: "time", "duration", "followup", "survival_time", "days",
-"months", "years", "event_time", "tte"
-
-\strong{Status columns}: "status", "event", "died", "death", "censored", "outcome",
-"vital_status", "event_indicator"
+Automatic column detection is not yet supported. Users must specify both
+\code{time} and \code{status} so the package does not guess the wrong columns.
 
 The resulting object retains all original columns but adds metadata about
 which columns represent time and status for use by bayesian_impute().
 }
 \examples{
 \dontrun{
-# Auto-detection (recommended for beginners)
 library(survival)
-lung_data <- prepare_survival_data(lung)
+lung_data <- prepare_survival_data(lung, time = "time", status = "status")
 
-# Manual specification  
 my_data <- prepare_survival_data(mydata, time = "duration", status = "died")
 
 # Then use directly with bayesian_impute

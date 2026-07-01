@@ -1,11 +1,11 @@
 Package: bird
 Title: Bayesian Imputation for Right-Censored Data
 Version: 0.1.0.9000
-Maintainer: Shirin Moghaddam <Shirin.Moghaddam@ul.ie>
+Maintainer: Jamie Wilson <jamie.wilson@ul.ie>
 Authors@R: 
     c(
-      person("Shirin", "Moghaddam", email = "Shirin.Moghaddam@ul.ie", role = c("aut", "cre")),
-      person("Jamie", "Wilson", email = "Jamie.Wilson@UL.ie", role = "aut")
+      person("Shirin", "Moghaddam", email = "Shirin.Moghaddam@ul.ie", role = "aut"),
+      person("Jamie", "Wilson", email = "jamie.wilson@ul.ie", role = c("aut", "cre"))
     )
 Description: Implements Bayesian imputation methodology for handling right-censored 
     survival data, treating censored observations as missing data and using Bayesian 
@@ -17,7 +17,6 @@ Description: Implements Bayesian imputation methodology for handling right-censo
     plotting methods for survival curves, density comparisons, and posterior 
     diagnostics. Enables standard statistical summaries and visualisations on 
     completed datasets, with export capabilities for multiple formats (CSV, RDS). 
-    Includes simulation tools for method validation and performance assessment. 
     Contains code derived from 'DPpackage' (Jara et al.) distributed under the terms 
     of the GNU General Public License.
 License: GPL (>= 2)
@@ -34,7 +33,6 @@ Imports:
     ggplot2 (>= 3.4.0),
     graphics,
     gridExtra,
-    haven,
     logspline (>= 2.1.16),
     methods,
     posterior (>= 1.4.0),
@@ -48,16 +46,10 @@ Imports:
     survival (>= 3.4.0)
 Suggests:
     bayesplot,
-    writexl,
     withr,
     testthat (>= 3.0.0),
     knitr (>= 1.42),
     rmarkdown (>= 2.21),
-    covr (>= 3.6.0),
-    shiny (>= 1.7.0),
-    DT (>= 0.27),
-    plotly (>= 4.10.0),
-    flexsurv (>= 2.2.0),
     coda (>= 0.19)
 SystemRequirements: C++17, GNU make
 Config/testthat/edition: 3

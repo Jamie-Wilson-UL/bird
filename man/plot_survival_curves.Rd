@@ -9,6 +9,7 @@ plot_survival_curves(
   n_curves = 10,
   alpha = 0.3,
   show_original = TRUE,
+  show_median = FALSE,
   dataset_id = NULL,
   palette = NULL,
   color = NULL,
@@ -23,6 +24,8 @@ plot_survival_curves(
 \item{alpha}{Transparency for imputed curves (default: 0.3)}
 
 \item{show_original}{Whether to show original Kaplan-Meier curves (default: TRUE)}
+
+\item{show_median}{Whether to show dotted median survival guide lines (default: FALSE)}
 }
 \value{
 ggplot object

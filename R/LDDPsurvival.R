@@ -65,7 +65,7 @@ UseMethod("LDDPsurvival")
 #' @param data data frame
 #' @param na.action na.action function
 #' @param work.dir working directory
-#' @export
+#' @keywords internal
 "LDDPsurvival.default" <-
 function(formula,
          zpred,
@@ -860,7 +860,6 @@ fancydensplot1<-function(x, hpd=TRUE, npts=200, xlab="", ylab="", main="",col="#
    }
 
 }
-
 
 
 

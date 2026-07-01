@@ -1,5 +1,10 @@
 # Utility functions for bird package
 
+# Null-coalescing helper used internally for optional defaults.
+`%||%` <- function(x, y) {
+  if (is.null(x)) y else x
+}
+
 #' Check if required packages are available
 #' @keywords internal
 check_required_packages <- function() {
@@ -42,7 +47,7 @@ format_time <- function(time_seconds) {
   }
 }
 
-#' Standardize completed dataset column order
+#' Standardise completed dataset column order
 #'
 #' Reorders completed datasets so original/new censor indicators and times are
 #' grouped together for easier inspection:
@@ -78,6 +83,27 @@ standardize_complete_column_order <- function(data, time_col = "time", status_co
   rest <- setdiff(cols, ordered)
 
   data[, c(ordered, rest), drop = FALSE]
+}
+
+#' Row-bind data frames after filling missing columns
+#' @param data_list List of data frames
+#' @return A data.frame containing all rows and the union of columns
+#' @keywords internal
+bind_rows_fill <- function(data_list) {
+  if (length(data_list) == 0) {
+    return(data.frame())
+  }
+
+  all_names <- unique(unlist(lapply(data_list, names), use.names = FALSE))
+  aligned <- lapply(data_list, function(x) {
+    missing_names <- setdiff(all_names, names(x))
+    for (nm in missing_names) {
+      x[[nm]] <- NA
+    }
+    x[, all_names, drop = FALSE]
+  })
+
+  do.call(rbind, aligned)
 }
 
 #' Drop survival_data metadata/class from completed dataset outputs

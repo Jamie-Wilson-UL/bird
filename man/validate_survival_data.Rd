@@ -4,7 +4,7 @@
 \alias{validate_survival_data}
 \title{Validate survival data input}
 \usage{
-validate_survival_data(data, time_var, status_var)
+validate_survival_data(data, time_var, status_var, verbose = TRUE)
 }
 \arguments{
 \item{data}{Data frame containing survival data}
@@ -12,6 +12,8 @@ validate_survival_data(data, time_var, status_var)
 \item{time_var}{Name of time variable}
 
 \item{status_var}{Name of status variable}
+
+\item{verbose}{Logical; print status-coding and censoring-pattern messages}
 }
 \value{
 List with validated and processed data

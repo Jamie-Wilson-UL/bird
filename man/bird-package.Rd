@@ -2,11 +2,10 @@
 % Please edit documentation in R/package.R
 \docType{package}
 \name{bird-package}
+\alias{bird}
 \alias{bird-package}
 \title{bird: Bayesian Imputation for Right-Censored Data}
 \description{
-Implements Bayesian imputation methodology for handling right-censored survival data, treating censored observations as missing data and using Bayesian methods to generate multiple completed datasets. Supports both parametric (Weibull, lognormal, exponential) and nonparametric (Linear Dependent Dirichlet Process) imputation approaches. Main entry point is the unified 'impute()' function. Advanced users can access 'bayesian_impute()' for parametric models and 'bayes_np_impute()' for nonparametric models directly. Includes comprehensive plotting methods for survival curves, density comparisons, and posterior diagnostics. Enables standard statistical summaries and visualisations on completed datasets, with export capabilities for multiple formats (CSV, RDS). Includes simulation tools for method validation and performance assessment. Contains code derived from 'DPpackage' (Jara et al.) distributed under the terms of the GNU General Public License.
-
 The bird package implements the Bayesian imputation methodology
 from Moghaddam et al. (2022) for handling right-censored survival data.
 The package treats censored observations as missing data and uses Bayesian
@@ -42,7 +41,6 @@ enabling complete dataset generation.
 \item Unlimited dataset generation by sampling from stored posterior distributions
 \item Comprehensive visualisations: survival curves, density plots, posterior plots, trace plots, pairs plots
 \item MCMC convergence diagnostics and validation
-\item Simulation framework with realistic censoring patterns (exponential and uniform)
 \item Posterior diagnostics for censored observations and posterior draws
 }
 }
@@ -81,20 +79,13 @@ Useful links:
   \item Report bugs at \url{https://github.com/Jamie-Wilson-UL/bird/issues}
 }
 
-
-Useful links:
-\itemize{
-  \item \url{https://github.com/Jamie-Wilson-UL/bird}
-  \item Report bugs at \url{https://github.com/Jamie-Wilson-UL/bird/issues}
-}
-
 }
 \author{
-\strong{Maintainer}: Shirin Moghaddam \email{Shirin.Moghaddam@ul.ie}
+\strong{Maintainer}: Jamie Wilson \email{jamie.wilson@ul.ie}
 
 Authors:
 \itemize{
-  \item Jamie Wilson \email{Jamie.Wilson@UL.ie}
+  \item Shirin Moghaddam \email{Shirin.Moghaddam@ul.ie}
 }
 
 }

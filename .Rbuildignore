@@ -57,6 +57,7 @@
 ^examples/.*\.(png|pdf|jpg|jpeg)$
 
 # Exclude development files
+^dev$
 ^BPD\.RData$
 ^BPD2\.R$
 ^USER_GUIDE\.md$
@@ -68,4 +69,9 @@
 ^qa_plots$
 ^qa_model_behavior$
 ^qa_model_behavior_full$
+^qa_prior_comparison$
 ^scripts$
+^cran-comments\.md$
+^tests/testthat/\.Rhistory$
+^tests/testthat/Rplots\.pdf$
+^tests/testthat/_snaps$

@@ -9,8 +9,8 @@
 #'
 #' @param data Data frame or `survival_data` object.
 #' @param models Character vector of model names to compare.
-#' @param time Optional time column name (auto-detected if missing).
-#' @param status Optional status column name (auto-detected if missing).
+#' @param time Time column name. Required unless `data` is a `survival_data` object.
+#' @param status Status column name. Required unless `data` is a `survival_data` object.
 #' @param n_imputations Number of completed datasets per model.
 #' @param time_unit Time unit label (e.g., `"days"`).
 #' @param priors Parametric prior list (passed to parametric models).
@@ -55,6 +55,9 @@ compare_models <- function(data,
 
   prepared <- data
   if (!inherits(prepared, "survival_data")) {
+    if (is.null(time) || is.null(status)) {
+      stop("Please specify both 'time' and 'status'; auto-detection is not yet supported.")
+    }
     prepared <- prepare_survival_data(
       data = prepared,
       time = time,

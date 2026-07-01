@@ -9,6 +9,7 @@ plot_survival_curves_by_group_safe(
   n_curves = 10,
   alpha = 0.3,
   show_original = TRUE,
+  show_median = FALSE,
   combine_groups = TRUE,
   ...
 )
@@ -21,6 +22,8 @@ plot_survival_curves_by_group_safe(
 \item{alpha}{Transparency for imputed curves (default: 0.3)}
 
 \item{show_original}{Whether to show original KM curves (default: TRUE)}
+
+\item{show_median}{Whether to show dotted median survival guide lines (default: FALSE)}
 
 \item{combine_groups}{Whether to show all groups on same plot (TRUE) or separate plots (FALSE)}
 

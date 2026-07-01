@@ -1,6 +1,6 @@
 #' Calculate Clinical Survival Metrics
 #' 
-#' Helper functions to compute clinically meaningful survival statistics
+#' Helper functions to compute survival statistics
 #' from bayesian_imputation objects
 #' 
 #' @keywords internal

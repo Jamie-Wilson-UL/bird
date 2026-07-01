@@ -10,6 +10,13 @@ data {
   vector<lower=0>[n_obs]  t_obs;
   vector<lower=0>[n_cens] t_cens;
 
+  // Prior family: 1 = lognormal shape + Gamma scale (default), 2 = lognormal.
+  int<lower=1, upper=2> prior_family;
+
+  // Gamma prior for the positive Weibull scale parameter.
+  real<lower=0> scale_prior_shape;
+  real<lower=0> scale_prior_rate;
+
   // Lognormal priors: if log(shape) ~ Normal(mu_log_shape, sd_log_shape),
   // then shape ~ Lognormal(mu_log_shape, sd_log_shape), similarly for scale.
   real          mu_log_shape;
@@ -29,9 +36,14 @@ parameters {
 }
 
 model {
-  // Priors (equivalent to Normal on logs)
-  shape ~ lognormal(mu_log_shape, sd_log_shape);
-  scale ~ lognormal(mu_log_scale, sd_log_scale);
+  // Priors
+  if (prior_family == 1) {
+    shape ~ lognormal(mu_log_shape, sd_log_shape);
+    scale ~ gamma(scale_prior_shape, scale_prior_rate);
+  } else {
+    shape ~ lognormal(mu_log_shape, sd_log_shape);
+    scale ~ lognormal(mu_log_scale, sd_log_scale);
+  }
 
   // Likelihood
   target += weibull_lpdf(t_obs  | shape, scale);   // events: log f(t)
@@ -76,4 +88,3 @@ generated quantities {
       t_imputed[i] = t_cens[i] * (1 + 1e-12);
   }
 }
-

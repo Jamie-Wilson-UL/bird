@@ -165,8 +165,54 @@ test_that("prepare_stan_data formats correctly", {
   expect_equal(stan_data$n_cens, 2)
   expect_equal(length(stan_data$t_obs), 3)
   expect_equal(length(stan_data$t_cens), 2)
-  expect_true(all(c("mu_log_shape", "sd_log_shape", 
-                   "mu_log_scale", "sd_log_scale", "shape_upper", "scale_upper") %in% names(stan_data)))
+  expect_equal(stan_data$prior_family, 1L)
+  expect_true(all(c(
+    "scale_prior_shape", "scale_prior_rate",
+    "mu_log_shape", "sd_log_shape",
+    "mu_log_scale", "sd_log_scale",
+    "shape_upper", "scale_upper"
+  ) %in% names(stan_data)))
+})
+
+test_that("prepare_stan_data supports Weibull lognormal prior family", {
+  test_data <- data.frame(
+    time = c(10, 15, 20, 25, 30),
+    status = c(1, 0, 1, 0, 1)
+  )
+
+  priors <- get_default_priors("weibull")
+  priors$prior_family <- "lognormal"
+
+  stan_data <- prepare_stan_data(test_data, "time", "status", "weibull", priors)
+
+  expect_equal(stan_data$prior_family, 2L)
+  expect_true(all(c(
+    "scale_prior_shape", "scale_prior_rate",
+    "mu_log_shape", "sd_log_shape",
+    "mu_log_scale", "sd_log_scale"
+  ) %in% names(stan_data)))
+})
+
+test_that("prepare_stan_data fills unused Weibull prior family defaults", {
+  test_data <- data.frame(
+    time = c(10, 15, 20, 25, 30),
+    status = c(1, 0, 1, 0, 1)
+  )
+
+  priors <- list(
+    prior_family = "gamma_scale",
+    scale_prior_shape = 3,
+    scale_prior_rate = 0.02
+  )
+
+  stan_data <- prepare_stan_data(test_data, "time", "status", "weibull", priors)
+
+  expect_equal(stan_data$prior_family, 1L)
+  expect_equal(stan_data$scale_prior_rate, 0.02)
+  expect_true(all(c(
+    "mu_log_shape", "sd_log_shape",
+    "mu_log_scale", "sd_log_scale"
+  ) %in% names(stan_data)))
 })
 
 test_that("prepare_stan_data works with exponential distribution", {

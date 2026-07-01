@@ -10,6 +10,7 @@
   n_curves = 10,
   alpha = 0.3,
   show_original = TRUE,
+  show_median = FALSE,
   n_max = NULL,
   color = NULL,
   palette = NULL,
@@ -28,6 +29,8 @@
 \item{alpha}{For survival plots: transparency for imputed curves (default: 0.3)}
 
 \item{show_original}{For survival plots: whether to show original Kaplan-Meier curve (default: TRUE)}
+
+\item{show_median}{For survival plots: whether to show dotted median survival guide lines (default: FALSE)}
 
 \item{n_max}{Backward-compatible alias:
 for \code{type = "survival"}, treated as \code{n_curves};

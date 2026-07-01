@@ -24,9 +24,9 @@ compare_models(
 
 \item{models}{Character vector of model names to compare.}
 
-\item{time}{Optional time column name (auto-detected if missing).}
+\item{time}{Time column name. Required unless \code{data} is a \code{survival_data} object.}
 
-\item{status}{Optional status column name (auto-detected if missing).}
+\item{status}{Status column name. Required unless \code{data} is a \code{survival_data} object.}
 
 \item{n_imputations}{Number of completed datasets per model.}
 

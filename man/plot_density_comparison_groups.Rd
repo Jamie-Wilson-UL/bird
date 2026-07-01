@@ -9,7 +9,7 @@ plot_density_comparison_groups(
   dataset_id = NULL,
   group_colors = NULL,
   n_curves = NULL,
-  alpha = 0.3,
+  alpha = 0.9,
   combine_groups = TRUE,
   ...
 )
@@ -26,7 +26,7 @@ or unnamed vector in group order.}
 
 \item{n_curves}{Number of imputed datasets to include (NULL for all)}
 
-\item{alpha}{Transparency for CI ribbon in each panel}
+\item{alpha}{Line transparency for overlaid group densities}
 
 \item{combine_groups}{For group density plots: whether to overlay groups on one plot (\code{TRUE})
 or show separate group panels (\code{FALSE}).}

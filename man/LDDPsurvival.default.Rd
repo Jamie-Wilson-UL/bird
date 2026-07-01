@@ -41,3 +41,4 @@
 \description{
 Default method for LDDPsurvival
 }
+\keyword{internal}

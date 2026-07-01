@@ -9,8 +9,8 @@
 #' - Otherwise, uses the parametric engine with the chosen `distribution`.
 #'
 #' @param data Data frame or `survival_data` prepared by `prepare_survival_data()`
-#' @param time Optional time column name (auto-detected if missing)
-#' @param status Optional status column name (auto-detected if missing; 1=event, 0=censored)
+#' @param time Time column name. Required unless `data` is a `survival_data` object.
+#' @param status Status column name (1=event, 0=censored). Required unless `data` is a `survival_data` object.
 #' @param groups Optional group variable name for group analyses
 #' @param model One of c("auto","parametric","nonparametric"). Default "auto".
 #' @param distribution For parametric: one of c("weibull","exponential","lognormal").
@@ -53,6 +53,9 @@ impute <- function(data,
   # Prepare/normalise data
   prepared_here <- FALSE
   if (!inherits(data, "survival_data")) {
+    if (is.null(time) || is.null(status)) {
+      stop("Please specify both 'time' and 'status'; auto-detection is not yet supported.")
+    }
     data <- prepare_survival_data(data, time = time, status = status,
                                   time_unit = time_unit, verbose = FALSE)
     prepared_here <- TRUE
@@ -61,8 +64,12 @@ impute <- function(data,
   time_col <- attr(data, "time_col")
   status_col <- attr(data, "status_col")
 
-  if (verbose && prepared_here && !is.null(time_col) && !is.null(status_col)) {
-    cat(sprintf("Detected columns: time='%s', status='%s'\n", time_col, status_col))
+  if (is.null(time_col) || is.null(status_col)) {
+    stop("Please specify both 'time' and 'status'; auto-detection is not yet supported.")
+  }
+
+  if (verbose && prepared_here) {
+    cat(sprintf("Using columns: time='%s', status='%s'\n", time_col, status_col))
   }
 
   # Decide engine
@@ -119,5 +126,4 @@ impute <- function(data,
     return(invoke_matching(bayesian_impute, arglist))
   }
 }
-
 

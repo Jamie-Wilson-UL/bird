@@ -19,7 +19,7 @@
 #' \dontrun{
 #' # Load and impute data
 #' data(lung, package = "survival")
-#' result <- bayesian_impute(lung, n_imputations = 5)
+#' result <- bayesian_impute(lung, time_col = "time", status_col = "status", n_imputations = 5)
 #'
 #' # Export all datasets as CSV files
 #' export(result, "lung_imputed", format = "csv")
@@ -31,7 +31,7 @@
 #' export(result, "lung_imputed", format = "csv", datasets = "first")
 #'
 #' # For group analysis
-#' result_groups <- bayesian_impute(data, groups = "treatment")
+#' result_groups <- bayesian_impute(data, time_col = "time", status_col = "status", groups = "treatment")
 #' export(result_groups, "group_imputed", format = "csv", groups = "combined")
 #' }
 #'
@@ -291,7 +291,7 @@ export_rds <- function(data, file_path, dataset_numbers, suffix = "", combine = 
 #'
 #' @examples
 #' \dontrun{
-#' result <- bayesian_impute(data, n_imputations = 5)
+#' result <- bayesian_impute(data, time_col = "time", status_col = "status", n_imputations = 5)
 #' quick_export(result, "my_imputed_data")
 #' }
 #'

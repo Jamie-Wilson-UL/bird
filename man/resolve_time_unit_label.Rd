@@ -7,7 +7,7 @@
 resolve_time_unit_label(x, fallback = "days")
 }
 \description{
-Helper functions to compute clinically meaningful survival statistics
+Helper functions to compute survival statistics
 from bayesian_imputation objects
 }
 \keyword{internal}

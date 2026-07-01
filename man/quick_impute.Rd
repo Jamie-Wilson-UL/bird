@@ -24,7 +24,8 @@ quick_impute(
 
 \item{time_unit}{Label describing the time unit to display (default "days")}
 
-\item{...}{Additional arguments passed to \code{bayesian_impute()}}
+\item{...}{Additional arguments passed to \code{impute()}. For raw data, this
+must include \code{time} and \code{status}.}
 }
 \value{
 bayesian_imputation object

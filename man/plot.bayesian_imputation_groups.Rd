@@ -11,6 +11,7 @@
   n_curves = 10,
   alpha = 0.3,
   show_original = TRUE,
+  show_median = FALSE,
   n_max = NULL,
   ...
 )
@@ -24,9 +25,13 @@
 
 \item{n_curves}{For survival plots: number of imputed curves to show per group (default: 10)}
 
-\item{alpha}{For survival plots: transparency for imputed curves}
+\item{alpha}{For survival plots: transparency for imputed curves.
+For \code{type = "density"}, this controls line transparency if explicitly supplied;
+otherwise grouped density plots use their own default.}
 
 \item{show_original}{For survival plots: whether to show original Kaplan-Meier curves}
+
+\item{show_median}{For survival plots: whether to show dotted median survival guide lines (default: FALSE)}
 
 \item{n_max}{Backward-compatible alias:
 for \code{type = "survival"}, treated as \code{n_curves};

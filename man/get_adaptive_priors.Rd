@@ -18,5 +18,8 @@ List of prior hyperparameters matching prepare_stan_data expectations
 Adaptive Weibull priors use the dispersion of log-times to set a rough center
 for log-shape via a Gumbel approximation (sd(log T) ~= pi/(alpha*sqrt(6))), and
 center log-scale to match the observed median using the relation
-median = scale * (log 2)^(1/shape).
+median = scale * (log 2)^(1/shape). By default these log-scale centers and
+spreads are used directly for the lognormal shape prior, while the scale center
+and spread are converted into Gamma prior hyperparameters by matching the
+implied lognormal mean and variance.
 }

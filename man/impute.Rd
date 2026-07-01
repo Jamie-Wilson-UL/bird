@@ -25,9 +25,9 @@ impute(
 \arguments{
 \item{data}{Data frame or \code{survival_data} prepared by \code{prepare_survival_data()}}
 
-\item{time}{Optional time column name (auto-detected if missing)}
+\item{time}{Time column name. Required unless \code{data} is a \code{survival_data} object.}
 
-\item{status}{Optional status column name (auto-detected if missing; 1=event, 0=censored)}
+\item{status}{Status column name (1=event, 0=censored). Required unless \code{data} is a \code{survival_data} object.}
 
 \item{groups}{Optional group variable name for group analyses}
 

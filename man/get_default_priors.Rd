@@ -15,3 +15,9 @@ List of default prior parameters
 \description{
 Get default priors for a given distribution
 }
+\details{
+For Weibull models, the default prior family uses a lognormal prior for
+\code{shape} and a Gamma prior for \code{scale}. The returned list also includes
+lognormal scale-prior fields so users can set \code{prior_family = "lognormal"}
+for sensitivity runs.
+}

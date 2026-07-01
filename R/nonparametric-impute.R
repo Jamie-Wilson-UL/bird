@@ -1,16 +1,17 @@
-#' bayes_np_impute
-#' ----------------
-#' Non-parametric Bayesian imputation for right-censored survival data using a
-#' *Linear Dependent Dirichlet-Process* model (originally from **DPpackage**).
+#' Non-parametric Bayesian imputation for right-censored survival data
+#'
+#' @description
+#' Uses a *Linear Dependent Dirichlet-Process* model (originally from
+#' **DPpackage**).
 #'
 #' This is a convenience wrapper around the internal
 #' [`dp_np_LDDPsurvival()`] function (a vendored copy of
 #' `DPpackage::LDDPsurvival()`), making it as easy to call as
 #' [`bayesian_impute()`].
 #'
-#' @param data A `data.frame` with survival information.
-#' @param time_col Name of the survival time column.
-#' @param status_col Name of the status column (1 = event, 0 = right-censored).
+#' @param data A data frame with survival information.
+#' @param time_col Name of the survival time column. Required unless `data` is a `survival_data` object.
+#' @param status_col Name of the status column (1 = event, 0 = right-censored). Required unless `data` is a `survival_data` object.
 #' @param groups Optional grouping variable for stratified analysis
 #' @param n_imputations Number of imputed complete datasets to generate (default: 10)
 #' @param prior A named list of prior hyper-parameters (same structure as the
@@ -79,11 +80,7 @@ bayes_np_impute <- function(data,
                             verbose = TRUE,
                             time_unit = NULL) {
   
-  # Track whether user explicitly passed columns
-  arg_missing_time <- missing(time_col)
-  arg_missing_status <- missing(status_col)
-  
-  # Handle survival_data objects (auto-detection)
+  # Handle explicitly prepared survival_data objects
   if (inherits(data, "survival_data")) {
     if (is.null(time_col)) {
       time_col <- attr(data, "time_col")
@@ -93,29 +90,15 @@ bayes_np_impute <- function(data,
     }
   }
   
-  # If columns are not provided or not present, auto-prepare to detect them
-  if (is.null(time_col) || is.null(status_col) ||
-      !(time_col %in% names(data)) || !(status_col %in% names(data))) {
-    if (verbose) message("Auto-preparing survival data (detecting time/status columns)...")
-    prepared <- prepare_survival_data(data, verbose = FALSE, time_unit = time_unit %||% attr(data, "time_unit") %||% "days")
-    data <- prepared
-    time_col <- attr(prepared, "time_col")
-    status_col <- attr(prepared, "status_col")
-    if (verbose && !is.null(time_col) && !is.null(status_col)) {
-      cat(sprintf("Detected columns: time='%s', status='%s'\n", time_col, status_col))
-    }
-  } else {
-    # No auto-prepare path; if user didn't pass columns and we're using defaults
-    if (verbose && arg_missing_time && arg_missing_status &&
-        (time_col %in% names(data)) && (status_col %in% names(data))) {
-      cat(sprintf("Detected columns: time='%s', status='%s'\n", time_col, status_col))
-    }
-  }
-  
   # Check that time_col and status_col are provided
   if (is.null(time_col) || is.null(status_col)) {
-    stop("You must specify 'time_col' and 'status_col'. ",
-         "Alternatively, use prepare_survival_data() first for auto-detection.")
+    stop("Please specify both 'time_col' and 'status_col'; auto-detection is not yet supported.")
+  }
+  if (!(time_col %in% names(data))) {
+    stop("Time column '", time_col, "' not found in data")
+  }
+  if (!(status_col %in% names(data))) {
+    stop("Status column '", status_col, "' not found in data")
   }
   
   if (is.null(groups)) {
@@ -163,7 +146,7 @@ bayes_np_impute_single <- function(data,
   # (skip if already validated)
   if (!inherits(data, "survival_data")) {
     if (verbose) cat("Validating input data...\n")
-    validation_result <- validate_survival_data(data, time_col, status_col)
+    validation_result <- validate_survival_data(data, time_col, status_col, verbose = verbose)
     data <- validation_result$data  # Use the potentially converted data
   } else {
     if (verbose) cat("Data already validated, skipping validation...\n")
@@ -260,7 +243,12 @@ bayes_np_impute_single <- function(data,
     if (verbose) {
       cat("No censored observations found - returning original data for all imputations\n")
     }
-    imputed_datasets <- replicate(n_imputations, data, simplify = FALSE)
+    imputed_datasets <- generate_complete_datasets_np(
+      data, time_col, status_col,
+      posterior_imputations = matrix(numeric(0), nrow = nrow(y_posterior), ncol = 0),
+      censored_indices = integer(0),
+      n_imputations = n_imputations
+    )
     posterior_imputations <- matrix(numeric(0), nrow = nrow(y_posterior), ncol = 0)
   } else {
     posterior_imputations <- y_posterior[, censored_indices, drop = FALSE]
@@ -354,6 +342,7 @@ generate_complete_datasets_np <- function(data, time_col, status_col,
       imputed_data$original_time <- data[[time_col]]
       imputed_data$original_status <- data[[status_col]]
       imputed_data$was_censored <- data[[status_col]] == 0
+      imputed_data$dataset_id <- i
       imputed_data <- standardize_complete_column_order(
         imputed_data,
         time_col = time_col,
@@ -396,6 +385,7 @@ generate_complete_datasets_np <- function(data, time_col, status_col,
       imputed_data[[status_col]][censored_indices[j]] <- 1L
     }
 
+    imputed_data$dataset_id <- i
     imputed_data <- standardize_complete_column_order(
       imputed_data,
       time_col = time_col,
@@ -450,7 +440,7 @@ bayes_np_impute_groups_safe <- function(data, time_col, status_col, groups,
       # First, apply the same status conversion logic that bayes_np_impute_single uses
       # (skip if already validated)
       if (!inherits(group_data, "survival_data")) {
-        validation_result <- validate_survival_data(group_data, time_col, status_col)
+        validation_result <- validate_survival_data(group_data, time_col, status_col, verbose = verbose)
         group_data_converted <- validation_result$data
       } else {
         group_data_converted <- group_data

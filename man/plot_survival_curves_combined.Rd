@@ -9,6 +9,7 @@ plot_survival_curves_combined(
   n_curves,
   alpha,
   show_original,
+  show_median,
   group_colors,
   ...
 )
@@ -21,6 +22,8 @@ plot_survival_curves_combined(
 \item{alpha}{Transparency}
 
 \item{show_original}{Whether to show original curves}
+
+\item{show_median}{Whether to show dotted median survival guide lines}
 
 \item{group_colors}{Color palette}
 

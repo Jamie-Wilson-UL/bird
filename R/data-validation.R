@@ -3,10 +3,11 @@
 #' Validate survival data input
 #' @param data Data frame containing survival data
 #' @param time_var Name of time variable
-#' @param status_var Name of status variable  
+#' @param status_var Name of status variable
+#' @param verbose Logical; print status-coding and censoring-pattern messages
 #' @return List with validated and processed data
 #' @keywords internal
-validate_survival_data <- function(data, time_var, status_var) {
+validate_survival_data <- function(data, time_var, status_var, verbose = TRUE) {
   
   # Check basic inputs
   checkmate::assert_data_frame(data, min.rows = 1)
@@ -59,11 +60,15 @@ validate_survival_data <- function(data, time_var, status_var) {
   # Handle different coding conventions
   if (all(unique_status %in% c(0, 1))) {
     # Standard 0/1 coding - no conversion needed
-    message("Status coding detected: 0 = censored, 1 = event")
+    if (verbose) {
+      message("Status coding detected: 0 = censored, 1 = event")
+    }
   } else if (all(unique_status %in% c(1, 2))) {
     # Common 1/2 coding - convert to 0/1
-    message("Status coding detected: 1 = censored, 2 = event")
-    message("Converting to standard coding: 0 = censored, 1 = event")
+    if (verbose) {
+      message("Status coding detected: 1 = censored, 2 = event")
+      message("Converting to standard coding: 0 = censored, 1 = event")
+    }
     status <- status - 1  # Convert 1,2 to 0,1
     data[[status_var]] <- status  # Update the original data
   } else {
@@ -94,7 +99,9 @@ validate_survival_data <- function(data, time_var, status_var) {
   min_censored <- ifelse(length(censored_times) > 0, min(censored_times), Inf)
   
   if (min_censored <= max_observed) {
-    message("Note: Some censoring times occur before the largest observed time.")
+    if (verbose) {
+      message("Note: Some censoring times occur before the largest observed time.")
+    }
   }
   
   return(list(
@@ -127,35 +134,14 @@ validate_imputation_params <- function(n_imputations, distribution, mcmc_options
   
   # Validate distribution
   checkmate::assert_string(distribution)
-  supported_distributions <- c("weibull")
+  supported_distributions <- c("weibull", "exponential", "lognormal")
   
   if (!distribution %in% supported_distributions) {
     stop("Distribution '", distribution, "' not supported. ",
          "Supported: ", paste(supported_distributions, collapse = ", "))
   }
   
-  # Validate MCMC options
-  if (is.null(mcmc_options)) {
-    mcmc_options <- list()
-  }
-  
-  # Set defaults
-  mcmc_defaults <- list(
-    iter_warmup = 1000,
-    iter_sampling = 1000,
-    chains = 4,
-    parallel_chains = 4,
-    refresh = 200,
-    adapt_delta = 0.8,
-    max_treedepth = 10
-  )
-  
-  # Override defaults with user options
-  for (param in names(mcmc_defaults)) {
-    if (is.null(mcmc_options[[param]])) {
-      mcmc_options[[param]] <- mcmc_defaults[[param]]
-    }
-  }
+  mcmc_options <- normalize_mcmc_options(mcmc_options)
   
   # Validate specific MCMC parameters
   checkmate::assert_int(mcmc_options$iter_warmup, lower = 100)
@@ -170,4 +156,3 @@ validate_imputation_params <- function(n_imputations, distribution, mcmc_options
     mcmc_options = mcmc_options
   ))
 }
-

@@ -47,10 +47,14 @@ test_that("pooled Cox Wald test combines imputations correctly", {
 
   pooled <- pool_cox_group_test(pooled_object)
   expect_true(is.list(pooled))
-  expect_true(all(c("coef", "vcov", "wald", "df", "p_value") %in% names(pooled)))
-  expect_true(is.numeric(pooled$wald))
-  expect_true(pooled$wald >= 0)
+  expect_true(all(c("coef", "vcov", "statistic", "df", "df2", "r1", "p_value") %in% names(pooled)))
+  expect_true(is.numeric(pooled$statistic))
+  expect_true(pooled$statistic >= 0)
+  expect_true(is.numeric(pooled$df2))
+  expect_true(is.finite(pooled$df2) || is.infinite(pooled$df2))
   expect_true(is.numeric(pooled$p_value))
   expect_true(pooled$p_value >= 0 && pooled$p_value <= 1)
-})
 
+  test_result <- calculate_log_rank_test(pooled_object)
+  expect_true(all(c("statistic", "numerator_df", "denominator_df", "p_value") %in% names(test_result)))
+})

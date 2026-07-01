@@ -95,6 +95,51 @@ test_that("complete() produces long format correctly", {
   expect_equal(result$.id, c(1, 2, 1, 2))  # Row IDs within each dataset
 })
 
+test_that("grouped complete() handles uneven completed dataset columns", {
+  original <- data.frame(
+    time = c(1, 2, 3, 4),
+    status = c(1, 0, 1, 1),
+    group = c("A", "A", "B", "B")
+  )
+
+  group_a <- structure(list(
+    original_data = original[original$group == "A", ],
+    time_col = "time",
+    status_col = "status",
+    imputed_datasets = list(data.frame(
+      time = c(1, 2.5),
+      status = c(1, 1),
+      original_time = c(1, 2),
+      original_status = c(1, 0),
+      was_censored = c(FALSE, TRUE),
+      group = "A"
+    ))
+  ), class = "bayesian_imputation")
+
+  group_b <- structure(list(
+    original_data = original[original$group == "B", ],
+    time_col = "time",
+    status_col = "status",
+    imputed_datasets = list(data.frame(
+      time = c(3, 4),
+      status = c(1, 1),
+      group = "B"
+    ))
+  ), class = "bayesian_imputation")
+
+  grouped <- structure(list(
+    group_names = c("A", "B"),
+    group_results = list(A = group_a, B = group_b),
+    original_data = original
+  ), class = c("bayesian_imputation_groups", "bayesian_imputation"))
+
+  out <- complete(grouped, dataset = 1, groups = "combined")
+
+  expect_equal(nrow(out), 4)
+  expect_true(all(c("time", "imputed_time", "status", "original_status", "was_censored") %in% names(out)))
+  expect_true(any(is.na(out$original_status[out$group == "B"])))
+})
+
 test_that("complete() validates inputs correctly", {
   
   # Test with non-bayesian_imputation object

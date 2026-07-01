@@ -177,6 +177,7 @@ print.bayesian_imputation <- function(x, ...) {
 #' @param n_curves For survival plots: number of imputed curves to display (default: 10)
 #' @param alpha For survival plots: transparency for imputed curves (default: 0.3)
 #' @param show_original For survival plots: whether to show original Kaplan-Meier curve (default: TRUE)
+#' @param show_median For survival plots: whether to show dotted median survival guide lines (default: FALSE)
 #' @param n_max Backward-compatible alias:
 #'   for `type = "survival"`, treated as `n_curves`;
 #'   for `type = "boxplots_comparison"`, maximum datasets shown.
@@ -196,7 +197,7 @@ print.bayesian_imputation <- function(x, ...) {
 #'   `panels = c("hist", "density", "survival", "boxplot")`
 #'   (or `"auto"` for the default layout).
 #' @export
-plot.bayesian_imputation <- function(x, type = "survival", n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, color = NULL, palette = NULL, ...) {
+plot.bayesian_imputation <- function(x, type = "survival", n_curves = 10, alpha = 0.3, show_original = TRUE, show_median = FALSE, n_max = NULL, color = NULL, palette = NULL, ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
@@ -214,7 +215,7 @@ plot.bayesian_imputation <- function(x, type = "survival", n_curves = 10, alpha 
   }
   
   switch(type,
-    "survival" = plot_survival_curves(x, n_curves = n_curves, alpha = alpha, show_original = show_original, color = color, palette = palette, ...),
+    "survival" = plot_survival_curves(x, n_curves = n_curves, alpha = alpha, show_original = show_original, show_median = show_median, color = color, palette = palette, ...),
     "histogram" = plot_histogram_dataset(x, color = color, palette = palette, ...),
     "boxplot" = plot_boxplot_dataset(x, color = color, palette = palette, ...),
     "trace" = plot_trace_plots(x, ...),
@@ -291,8 +292,11 @@ print.bayesian_imputation_groups <- function(x, ...) {
 #' @param type Type of plot ("survival", "trace", "pairs", "posterior", "completed_dataset_summary", "boxplots_comparison", "density")
 #' @param combine_groups For survival plots: whether to show all groups on same plot (TRUE) or separate plots (FALSE)
 #' @param n_curves For survival plots: number of imputed curves to show per group (default: 10)
-#' @param alpha For survival plots: transparency for imputed curves
+#' @param alpha For survival plots: transparency for imputed curves.
+#'   For `type = "density"`, this controls line transparency if explicitly supplied;
+#'   otherwise grouped density plots use their own default.
 #' @param show_original For survival plots: whether to show original Kaplan-Meier curves
+#' @param show_median For survival plots: whether to show dotted median survival guide lines (default: FALSE)
 #' @param n_max Backward-compatible alias:
 #'   for `type = "survival"`, treated as `n_curves`;
 #'   for `type = "boxplots_comparison"`, maximum datasets shown.
@@ -309,7 +313,8 @@ print.bayesian_imputation_groups <- function(x, ...) {
 #'   on one plot and `combine_groups = FALSE` shows separate group panels.
 #' @export
 plot.bayesian_imputation_groups <- function(x, type = "survival", combine_groups = TRUE, 
-                                           n_curves = 10, alpha = 0.3, show_original = TRUE, n_max = NULL, ...) {
+                                           n_curves = 10, alpha = 0.3, show_original = TRUE, show_median = FALSE, n_max = NULL, ...) {
+  alpha_supplied <- !missing(alpha)
   
   # Check if we have enough groups to plot
   if (length(x$group_names) < 1) {
@@ -321,13 +326,19 @@ plot.bayesian_imputation_groups <- function(x, type = "survival", combine_groups
   }
   
   switch(type,
-    "survival" = plot_survival_curves_by_group_safe(x, n_curves, alpha, show_original, combine_groups, ...),
+    "survival" = plot_survival_curves_by_group_safe(x, n_curves, alpha, show_original, show_median, combine_groups, ...),
     "trace" = plot_individual_groups_safe(x, "trace", ...),
     "pairs" = plot_individual_groups_safe(x, "pairs", ...),
     "posterior" = plot_posterior_censored_groups(x, ...),
     "completed_dataset_summary" = plot_completed_dataset_summary_groups(x, ...),
     "boxplots_comparison" = plot_boxplots_comparison_groups(x, n_max = n_max %||% 10, ...),
-    "density" = plot_density_comparison_groups(x, combine_groups = combine_groups, ...),
+    "density" = {
+      if (alpha_supplied) {
+        plot_density_comparison_groups(x, combine_groups = combine_groups, alpha = alpha, ...)
+      } else {
+        plot_density_comparison_groups(x, combine_groups = combine_groups, ...)
+      }
+    },
     stop("Unknown plot type: ", type, ". Options: 'survival', 'trace', 'pairs', 'posterior', 'completed_dataset_summary', 'boxplots_comparison', 'density'")
   )
 }
@@ -500,8 +511,9 @@ calculate_log_rank_test <- function(object) {
     if (is.null(pooled)) return(NULL)
     list(
       p_value = pooled$p_value,
-      chi_square = pooled$wald,
-      df = pooled$df
+      statistic = pooled$statistic,
+      numerator_df = pooled$df,
+      denominator_df = pooled$df2
     )
   }, error = function(e) {
     return(NULL)
@@ -620,21 +632,57 @@ pool_cox_group_test <- function(object) {
     }
     bbar <- colMeans(coef_mat)
     Tmat <- W + (1 + 1/used) * B
-    
-    # Stabilize in case of near-singularity
-    solve_T <- tryCatch(solve(Tmat), error = function(e) NULL)
-    if (is.null(solve_T)) {
+
+    # D1 multivariate Wald test: use the pooled point estimate, average
+    # within-imputation covariance, relative increase in variance, and an
+    # F reference distribution (Li, Raghunathan and Rubin, 1991).
+    solve_W <- tryCatch(solve(W), error = function(e) NULL)
+    if (is.null(solve_W)) {
       ridge <- 1e-8
-      Tmat <- Tmat + diag(ridge, nrow(Tmat))
-      solve_T <- tryCatch(solve(Tmat), error = function(e) NULL)
+      W <- W + diag(ridge, nrow(W))
+      solve_W <- tryCatch(solve(W), error = function(e) NULL)
     }
-    if (is.null(solve_T)) return(NULL)
-    
-    wald <- as.numeric(t(bbar) %*% solve_T %*% bbar)
+    if (is.null(solve_W)) return(NULL)
+
     df <- length(bbar)
-    p_value <- stats::pchisq(wald, df = df, lower.tail = FALSE)
+    r1 <- as.numeric((1 + 1/used) * sum(diag(B %*% solve_W)) / df)
+    if (!is.finite(r1) || r1 < 0) {
+      r1 <- 0
+    }
+
+    T_d1 <- (1 + r1) * W
+    solve_T_d1 <- tryCatch(solve(T_d1), error = function(e) NULL)
+    if (is.null(solve_T_d1)) {
+      ridge <- 1e-8
+      T_d1 <- T_d1 + diag(ridge, nrow(T_d1))
+      solve_T_d1 <- tryCatch(solve(T_d1), error = function(e) NULL)
+    }
+    if (is.null(solve_T_d1)) return(NULL)
+
+    statistic <- as.numeric(t(bbar) %*% solve_T_d1 %*% bbar) / df
+    t_df <- df * (used - 1)
+    df2 <- if (r1 <= 0 || !is.finite(r1)) {
+      Inf
+    } else if (t_df > 4) {
+      4 + (t_df - 4) * (1 + (1 - 2 / t_df) / r1)^2
+    } else {
+      t_df * (1 + 1 / df) * (1 + 1 / r1)^2 / 2
+    }
+    if (!is.finite(df2) && !is.infinite(df2)) {
+      return(NULL)
+    }
+    p_value <- stats::pf(statistic, df1 = df, df2 = df2, lower.tail = FALSE)
     
-    list(coef = bbar, vcov = Tmat, wald = wald, df = df, p_value = p_value, m_used = used)
+    list(
+      coef = bbar,
+      vcov = Tmat,
+      statistic = statistic,
+      df = df,
+      df2 = df2,
+      r1 = r1,
+      p_value = p_value,
+      m_used = used
+    )
   }, error = function(e) {
     NULL
   })
@@ -715,18 +763,18 @@ print_comprehensive_group_comparison_safe <- function(object) {
   print_survival_comparison_safe(object, group_metrics)
   
   # Statistical tests
-  cat("\n1. Global Group Effect (Pooled Cox Wald Test):\n")
+  cat("\n1. Global Group Effect (Pooled Cox D1 Wald Test):\n")
   cat("----------------------------------------------\n")
   log_rank_results <- calculate_log_rank_test(object)
   if (!is.null(log_rank_results$p_value)) {
-    cat(sprintf("  Pooled Cox (Wald) P-value: %.4f\n", log_rank_results$p_value))
+    cat(sprintf("  Pooled Cox D1 Wald P-value: %.4f\n", log_rank_results$p_value))
     if (log_rank_results$p_value < 0.05) {
       cat("  (Statistically significant difference in survival)\n")
     } else {
       cat("  (No statistically significant difference in survival)\n")
     }
   } else {
-    cat("  Pooled Cox Wald test could not be calculated.\n")
+    cat("  Pooled Cox D1 Wald test could not be calculated.\n")
   }
   cat("\n2. Hazard Ratio Summary (from pooled Cox model):\n")
   cat("------------------------------------------------\n")
@@ -806,14 +854,14 @@ combine_group_datasets_safe <- function(object, dataset, format) {
   }
 
   combine_one <- function(i) {
-    combined_data <- data.frame()
-    for (group_name in object$group_names) {
+    group_rows <- lapply(object$group_names, function(group_name) {
       group_data <- object$group_results[[group_name]]$imputed_datasets[[i]]
       if (!(".imp" %in% names(group_data))) {
         group_data$.imp <- i
       }
-      combined_data <- rbind(combined_data, group_data)
-    }
+      group_data
+    })
+    combined_data <- bind_rows_fill(group_rows)
     combined_data <- format_completed_dataset_output(
       combined_data,
       time_col = time_col

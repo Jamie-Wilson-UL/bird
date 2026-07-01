@@ -2,11 +2,7 @@
 % Please edit documentation in R/nonparametric-impute.R
 \name{bayes_np_impute}
 \alias{bayes_np_impute}
-\title{\subsection{bayes_np_impute}{
-
-Non-parametric Bayesian imputation for right-censored survival data using a
-\emph{Linear Dependent Dirichlet-Process} model (originally from \strong{DPpackage}).
-}}
+\title{Non-parametric Bayesian imputation for right-censored survival data}
 \usage{
 bayes_np_impute(
   data,
@@ -22,11 +18,11 @@ bayes_np_impute(
 )
 }
 \arguments{
-\item{data}{A \code{data.frame} with survival information.}
+\item{data}{A data frame with survival information.}
 
-\item{time_col}{Name of the survival time column.}
+\item{time_col}{Name of the survival time column. Required unless \code{data} is a \code{survival_data} object.}
 
-\item{status_col}{Name of the status column (1 = event, 0 = right-censored).}
+\item{status_col}{Name of the status column (1 = event, 0 = right-censored). Required unless \code{data} is a \code{survival_data} object.}
 
 \item{groups}{Optional grouping variable for stratified analysis}
 
@@ -61,6 +57,9 @@ A \code{bayesian_imputation} object containing:
 }
 }
 \description{
+Uses a \emph{Linear Dependent Dirichlet-Process} model (originally from
+\strong{DPpackage}).
+
 This is a convenience wrapper around the internal
 \code{\link[=dp_np_LDDPsurvival]{dp_np_LDDPsurvival()}} function (a vendored copy of
 \code{DPpackage::LDDPsurvival()}), making it as easy to call as

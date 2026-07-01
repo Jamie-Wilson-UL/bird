@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{standardize_complete_column_order}
 \alias{standardize_complete_column_order}
-\title{Standardize completed dataset column order}
+\title{Standardise completed dataset column order}
 \usage{
 standardize_complete_column_order(
   data,

@@ -8,13 +8,13 @@
 #' observation.
 #'
 #' @param data A data frame containing survival data
-#' @param time_col Name of the time column
-#' @param status_col Name of the status column (1 = event, 0 = censored)
+#' @param time_col Name of the time column. Required unless `data` is a `survival_data` object.
+#' @param status_col Name of the status column (1 = event, 0 = censored). Required unless `data` is a `survival_data` object.
 #' @param groups Name of the group variable for group comparison (optional)
 #' @param n_imputations Number of imputed complete datasets to generate (default: 10)
 #' @param distribution Distribution to use ("weibull", "exponential", "lognormal")
 #' @param priors List of prior parameters for the distribution parameters
-#' @param mcmc_options List of MCMC sampling options (chains, iterations, etc.)
+#' @param mcmc_options List of MCMC sampling options (chains, iterations etc.)
 #' @param verbose Print progress messages (default: TRUE)
 #' @param time_unit Optional label for the time unit used in outputs (default: "days")
 #'
@@ -91,7 +91,7 @@ bayesian_impute <- function(data, time_col = NULL, status_col = NULL,
                            verbose = TRUE,
                            time_unit = NULL) {
   
-  # Handle survival_data objects (auto-detection)
+  # Handle explicitly prepared survival_data objects
   if (inherits(data, "survival_data")) {
     if (is.null(time_col)) {
       time_col <- attr(data, "time_col")
@@ -101,23 +101,15 @@ bayesian_impute <- function(data, time_col = NULL, status_col = NULL,
     }
   }
   
-  # If columns are not provided or not present, auto-prepare to detect them
-  if (is.null(time_col) || is.null(status_col) ||
-      !(time_col %in% names(data)) || !(status_col %in% names(data))) {
-    if (verbose) message("Auto-preparing survival data (detecting time/status columns)...")
-    prepared <- prepare_survival_data(data, verbose = FALSE, time_unit = time_unit %||% attr(data, "time_unit") %||% "days")
-    data <- prepared
-    time_col <- attr(prepared, "time_col")
-    status_col <- attr(prepared, "status_col")
-    if (verbose && !is.null(time_col) && !is.null(status_col)) {
-      cat(sprintf("Detected columns: time='%s', status='%s'\n", time_col, status_col))
-    }
-  }
-  
   # Check that time_col and status_col are provided
   if (is.null(time_col) || is.null(status_col)) {
-    stop("You must specify 'time_col' and 'status_col'. ",
-         "Alternatively, use prepare_survival_data() first for auto-detection.")
+    stop("Please specify both 'time_col' and 'status_col'; auto-detection is not yet supported.")
+  }
+  if (!(time_col %in% names(data))) {
+    stop("Time column '", time_col, "' not found in data")
+  }
+  if (!(status_col %in% names(data))) {
+    stop("Status column '", status_col, "' not found in data")
   }
   
   if (is.null(groups)) {
@@ -142,7 +134,7 @@ bayesian_impute <- function(data, time_col = NULL, status_col = NULL,
 #' @param n_imputations Number of imputed complete datasets to generate (default: 10)
 #' @param distribution Distribution to use ("weibull", "exponential", "lognormal")
 #' @param priors List of prior parameters for the distribution parameters
-#' @param mcmc_options List of MCMC sampling options (chains, iterations, etc.)
+#' @param mcmc_options List of MCMC sampling options (chains, iterations etc.)
 #' @param verbose Print progress messages (default: TRUE)
 #'
 #' @return A bayesian_imputation object
@@ -205,6 +197,9 @@ bayesian_impute_single <- function(data, time_col = NULL, status_col = NULL,
     if (verbose) {
       cat("Using data-adaptive priors based on observed events\n")
     }
+  }
+  if (identical(distribution, "weibull")) {
+    priors <- normalize_weibull_priors(priors)
   }
   
   # Merge user-provided MCMC options with sensible defaults
@@ -456,7 +451,24 @@ prepare_stan_data <- function(data, time_col, status_col, distribution, priors) 
   
   # Add distribution-specific prior parameters
   if (distribution == "weibull") {
-    # Log-parameterisation priors
+    priors <- normalize_weibull_priors(priors)
+
+    prior_family <- priors$prior_family %||% "gamma_scale"
+    if (!prior_family %in% c("gamma_scale", "lognormal")) {
+      stop("Unsupported Weibull prior_family: ", prior_family, ". Use 'gamma_scale' or 'lognormal'.")
+    }
+    stan_data$prior_family <- if (identical(prior_family, "gamma_scale")) 1L else 2L
+
+    if (is.null(priors$scale_prior_shape) || is.null(priors$scale_prior_rate)) {
+      stop("Weibull Gamma scale prior requires scale_prior_shape and scale_prior_rate.")
+    }
+    if (is.null(priors$mu_log_shape) || is.null(priors$sd_log_shape) ||
+        is.null(priors$mu_log_scale) || is.null(priors$sd_log_scale)) {
+      stop("Weibull lognormal priors require mu_log_shape, sd_log_shape, mu_log_scale and sd_log_scale.")
+    }
+
+    stan_data$scale_prior_shape <- priors$scale_prior_shape
+    stan_data$scale_prior_rate <- priors$scale_prior_rate
     stan_data$mu_log_shape <- priors$mu_log_shape
     stan_data$sd_log_shape <- priors$sd_log_shape
     stan_data$mu_log_scale <- priors$mu_log_scale

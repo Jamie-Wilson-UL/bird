@@ -36,6 +36,168 @@ panel_title_bird <- function(text, base_size = 13) {
   )
 }
 
+adaptive_histogram_bins <- function(x, min_bins = 4, max_bins = 30) {
+  x <- x[is.finite(x)]
+  n <- length(x)
+  n_unique <- length(unique(x))
+  if (n < 2 || n_unique < 2) {
+    return(1L)
+  }
+
+  xr <- range(x)
+  span <- diff(xr)
+  if (!is.finite(span) || span <= 0) {
+    return(1L)
+  }
+
+  iqr <- stats::IQR(x, na.rm = TRUE)
+  fd_bins <- NA_real_
+  if (is.finite(iqr) && iqr > 0) {
+    fd_width <- 2 * iqr / (n^(1 / 3))
+    if (is.finite(fd_width) && fd_width > 0) {
+      fd_bins <- ceiling(span / fd_width)
+    }
+  }
+
+  sturges_bins <- ceiling(log2(n) + 1)
+  bins <- if (is.finite(fd_bins) && fd_bins > 0) fd_bins else sturges_bins
+
+  lower <- min(min_bins, n_unique)
+  upper <- max(lower, min(max_bins, max(1L, ceiling(n / 2))))
+  as.integer(max(1L, min(upper, max(lower, bins))))
+}
+
+km_survival_plot_data <- function(km, start_time = 0, ...) {
+  out <- data.frame(
+    time = c(start_time, km$time),
+    survival = c(1, km$surv),
+    stringsAsFactors = FALSE
+  )
+
+  extra <- list(...)
+  if (length(extra) > 0) {
+    extra_names <- names(extra)
+    if (is.null(extra_names) || any(!nzchar(extra_names))) {
+      stop("Additional survival plot columns must be named")
+    }
+    for (nm in extra_names) {
+      out[[nm]] <- rep(extra[[nm]], length.out = nrow(out))
+    }
+  }
+
+  out
+}
+
+plot_time_unit <- function(x, fallback = "days") {
+  unit <- resolve_time_unit_label(x, fallback = NULL)
+  if (is.null(unit) && !is.null(x$group_results) && length(x$group_results) > 0) {
+    unit <- resolve_time_unit_label(x$group_results[[1]], fallback = NULL)
+  }
+  if (is.null(unit) && !is.null(x$model_results) && length(x$model_results) > 0) {
+    unit <- resolve_time_unit_label(x$model_results[[1]], fallback = NULL)
+  }
+  if (is.null(unit) || !nzchar(as.character(unit)[1])) {
+    unit <- fallback
+  }
+  as.character(unit)[1]
+}
+
+time_axis_label <- function(x, prefix = "Time") {
+  paste0(prefix, " (", plot_time_unit(x), ")")
+}
+
+density_plot_grid <- function(values, n = 400) {
+  values <- values[is.finite(values) & values >= 0]
+  if (length(values) < 1) {
+    return(seq(0, 1, length.out = n))
+  }
+
+  upper <- max(values, na.rm = TRUE)
+  if (!is.finite(upper) || upper <= 0) {
+    upper <- 1
+  }
+
+  seq(0, upper, length.out = n)
+}
+
+logspline_density_on_grid <- function(values, grid, density_scale = c("auto", "time", "log")) {
+  density_scale <- match.arg(density_scale)
+  values <- values[is.finite(values) & values >= 0]
+  if (length(values) < 2) {
+    return(rep(NA_real_, length(grid)))
+  }
+
+  fit_logspline_quiet <- function(x, ...) {
+    fit <- NULL
+    utils::capture.output(
+      fit <- suppressMessages(suppressWarnings(logspline::logspline(x, ...)))
+    )
+    fit
+  }
+
+  positive_values <- values[values > 0]
+  if (density_scale == "auto") {
+    if (length(positive_values) >= 50) {
+      density_scale <- "log"
+    } else {
+      density_scale <- "time"
+    }
+  }
+
+  y_density <- NULL
+  if (requireNamespace("logspline", quietly = TRUE)) {
+    if (density_scale == "log" && length(positive_values) >= 2) {
+      ls_fit <- tryCatch(
+        fit_logspline_quiet(log(positive_values)),
+        error = function(e) tryCatch(
+          fit_logspline_quiet(log(positive_values), maxknots = 6),
+          error = function(e2) NULL
+        )
+      )
+      if (!is.null(ls_fit)) {
+        y_density <- rep(0, length(grid))
+        positive_grid <- grid > 0
+        y_density[positive_grid] <- logspline::dlogspline(log(grid[positive_grid]), ls_fit) / grid[positive_grid]
+      }
+    } else {
+      ls_fit <- tryCatch(
+        fit_logspline_quiet(values),
+        error = function(e) tryCatch(
+          fit_logspline_quiet(values, maxknots = 6),
+          error = function(e2) NULL
+        )
+      )
+      if (!is.null(ls_fit)) {
+        y_density <- logspline::dlogspline(grid, ls_fit)
+      }
+    }
+  }
+
+  if (is.null(y_density)) {
+    if (density_scale == "log" && length(positive_values) >= 2) {
+      dens <- stats::density(log(positive_values), n = length(grid))
+      y_density <- rep(0, length(grid))
+      positive_grid <- grid > 0
+      log_y <- stats::approx(dens$x, dens$y, xout = log(grid[positive_grid]), rule = 2)$y
+      y_density[positive_grid] <- log_y / grid[positive_grid]
+    } else {
+      dens <- stats::density(values, from = min(grid), to = max(grid), n = length(grid))
+      y_density <- stats::approx(dens$x, dens$y, xout = grid, rule = 2)$y
+    }
+  }
+
+  y_density
+}
+
+selected_dataset_label <- function(ids, label = "selected dataset") {
+  nm <- names(ids)
+  ids <- as.integer(ids)
+  if (length(ids) > 0 && length(unique(ids)) == 1) {
+    return(paste0(label, " ", ids[[1]]))
+  }
+  paste0(label, "s: ", paste0(nm, "=", ids, collapse = ", "))
+}
+
 resolve_group_colors <- function(group_names, group_colors = NULL) {
   n <- length(group_names)
   default_cols <- grDevices::hcl.colors(n, "Dark 3")
@@ -151,7 +313,7 @@ resolve_comparison_dataset_ids <- function(dataset_id, keys, n_by_key, label = "
   n_common <- min(n_by_key)
 
   if (is.null(dataset_id)) {
-    id <- sample(seq_len(n_common), 1)
+    id <- 1L
     out <- rep(id, length(keys))
     names(out) <- keys
     return(out)
@@ -247,9 +409,10 @@ resolve_dataset_colors <- function(indices, color = NULL) {
 #' @param n_curves Number of imputed curves to show (default: 10)
 #' @param alpha Transparency for imputed curves (default: 0.3)
 #' @param show_original Whether to show original Kaplan-Meier curves (default: TRUE)
+#' @param show_median Whether to show dotted median survival guide lines (default: FALSE)
 #' @return ggplot object
 #' @keywords internal
-plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = TRUE, dataset_id = NULL, palette = NULL, color = NULL, ...) {
+plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = TRUE, show_median = FALSE, dataset_id = NULL, palette = NULL, color = NULL, ...) {
   
   if (!requireNamespace("survival", quietly = TRUE)) {
     stop("survival package required for Kaplan-Meier curves")
@@ -264,7 +427,7 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
     as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
     data = x$original_data
   )
-  orig_df <- data.frame(time = km_orig$time, survival = km_orig$surv, type = "KM estimation")
+  orig_df <- km_survival_plot_data(km_orig, type = "KM estimation")
   
   # Select imputed datasets for plotting (specific dataset if requested, otherwise sample)
   n_total <- length(x$imputed_datasets)
@@ -289,13 +452,11 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
       data = selected_datasets[[j]]
     )
     
-    imputed_curves[[j]] <- data.frame(
-      time = km_imp$time,
-      survival = km_imp$surv,
+    imputed_curves[[j]] <- km_survival_plot_data(
+      km_imp,
       type = "Bayesian imputation",
       dataset_id = i,
-      dataset_label = paste("Dataset", i),
-      stringsAsFactors = FALSE
+      dataset_label = paste("Dataset", i)
     )
   }
   
@@ -331,7 +492,7 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
       ggplot2::labs(
         title = title_text,
         subtitle = NULL,
-        x = paste0("Time (", x$model_info$time_unit %||% "days", ")"), 
+        x = time_axis_label(x), 
         y = "Survival probability"
       ) +
       ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
@@ -352,7 +513,7 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
       ggplot2::labs(
         title = title_text,
         subtitle = NULL,
-        x = paste0("Time (", x$model_info$time_unit %||% "days", ")"), 
+        x = time_axis_label(x), 
         y = "Survival probability", color = NULL
       ) +
       ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(linewidth = 1.2, alpha = 1)))
@@ -374,7 +535,7 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
   median_mean <- mean(all_medians, na.rm = TRUE)
   median_q025 <- stats::quantile(all_medians, 0.025, na.rm = TRUE)
   median_q975 <- stats::quantile(all_medians, 0.975, na.rm = TRUE)
-  if (is.finite(median_mean)) {
+  if (isTRUE(show_median) && is.finite(median_mean)) {
     hseg <- data.frame(x_start = 0, y = 0.5, x_end = median_mean, y_end = 0.5)
     vseg <- data.frame(x_start = median_mean, y = 0.5, x_end = median_mean, y_end = 0)
     p <- p +
@@ -392,7 +553,7 @@ plot_survival_curves <- function(x, n_curves = 10, alpha = 0.3, show_original = 
   
   # Caption with median summary (match groups style)
   cap_txt <- if (is.finite(median_mean)) {
-    unit <- x$model_info$time_unit %||% "days"
+    unit <- plot_time_unit(x)
     paste0("Median survival time: ", round(median_mean, 1), " ", unit, " (95% CI: ",
            round(median_q025, 1), " - ", round(median_q975, 1), ")")
   } else {
@@ -460,7 +621,7 @@ plot_boxplots_comparison <- function(x, n_max = 10, dataset_id = NULL, dataset_i
       } else {
         paste("Comparing selected datasets:", paste(selected_indices, collapse = ", "))
       },
-      x = "Survival Time",
+      x = time_axis_label(x, "Survival time"),
       y = "Imputed Dataset"
     )
 
@@ -471,7 +632,7 @@ plot_boxplots_comparison <- function(x, n_max = 10, dataset_id = NULL, dataset_i
 
 #' Plot histogram for a single completed dataset
 #' @param x bayesian_imputation object
-#' @param dataset_id Dataset index to plot (NULL for random)
+#' @param dataset_id Dataset index to plot (NULL for first completed dataset)
 #' @param palette Optional color overrides
 #' @param ... Additional arguments
 #' @return ggplot object
@@ -488,7 +649,7 @@ plot_histogram_dataset <- function(x, dataset_id = NULL, palette = NULL, color =
 
   selected_indices <- validate_dataset_indices(dataset_id, n_datasets)
   if (is.null(selected_indices)) {
-    selected_indices <- sample(seq_len(n_datasets), 1)
+    selected_indices <- 1L
   }
   selected_indices <- sort(selected_indices)
 
@@ -497,10 +658,14 @@ plot_histogram_dataset <- function(x, dataset_id = NULL, palette = NULL, color =
   if (length(selected_indices) == 1) {
     ds <- x$imputed_datasets[[selected_indices]]
     p <- ggplot2::ggplot(ds, ggplot2::aes(x = .data[[time_var]])) +
-      ggplot2::geom_histogram(bins = 30, fill = palette_map[["hist_fill"]], alpha = 0.75) +
+      ggplot2::geom_histogram(
+        bins = adaptive_histogram_bins(ds[[time_var]]),
+        fill = palette_map[["hist_fill"]],
+        alpha = 0.75
+      ) +
       ggplot2::labs(
         title = paste("Histogram - Completed Dataset", selected_indices),
-        x = paste0("Time (", x$model_info$time_unit %||% "days", ")"),
+        x = time_axis_label(x),
         y = "Count"
       )
   } else {
@@ -516,11 +681,15 @@ plot_histogram_dataset <- function(x, dataset_id = NULL, palette = NULL, color =
     )
     color_map <- resolve_dataset_colors(selected_indices, color = color)
     p <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, fill = .dataset)) +
-      ggplot2::geom_histogram(bins = 30, alpha = 0.45, position = "identity") +
+      ggplot2::geom_histogram(
+        bins = adaptive_histogram_bins(all_data$.time),
+        alpha = 0.45,
+        position = "identity"
+      ) +
       ggplot2::scale_fill_manual(values = color_map, name = "Imputed dataset") +
       ggplot2::labs(
         title = paste0("Histogram Comparison - Datasets ", paste(selected_indices, collapse = ", ")),
-        x = paste0("Time (", x$model_info$time_unit %||% "days", ")"),
+        x = time_axis_label(x),
         y = "Count"
       )
   }
@@ -534,7 +703,7 @@ plot_histogram_dataset <- function(x, dataset_id = NULL, palette = NULL, color =
 
 #' Plot boxplot for one or more completed datasets
 #' @param x bayesian_imputation object
-#' @param dataset_id Dataset index/indices to plot (NULL for random)
+#' @param dataset_id Dataset index/indices to plot (NULL for first completed dataset)
 #' @param palette Optional color overrides
 #' @param ... Additional arguments
 #' @return ggplot object
@@ -551,7 +720,7 @@ plot_boxplot_dataset <- function(x, dataset_id = NULL, palette = NULL, color = N
 
   selected_indices <- validate_dataset_indices(dataset_id, n_datasets)
   if (is.null(selected_indices)) {
-    selected_indices <- sample(seq_len(n_datasets), 1)
+    selected_indices <- 1L
   }
   selected_indices <- sort(selected_indices)
 
@@ -565,7 +734,7 @@ plot_boxplot_dataset <- function(x, dataset_id = NULL, palette = NULL, color = N
       ggplot2::labs(
         title = paste("Boxplot - Completed Dataset", selected_indices),
         x = "",
-        y = paste0("Time (", x$model_info$time_unit %||% "days", ")")
+        y = time_axis_label(x)
       )
   } else {
     plot_data <- do.call(
@@ -585,7 +754,7 @@ plot_boxplot_dataset <- function(x, dataset_id = NULL, palette = NULL, color = N
       ggplot2::labs(
         title = paste0("Boxplot Comparison - Datasets ", paste(selected_indices, collapse = ", ")),
         x = "Imputed dataset",
-        y = paste0("Time (", x$model_info$time_unit %||% "days", ")")
+        y = time_axis_label(x)
       )
   }
 
@@ -790,7 +959,8 @@ plot_posterior_censored <- function(result, obs_id = NULL, dataset_id = NULL, sh
   # Build plot
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = imputed_time_draw)) +
     ggplot2::geom_histogram(ggplot2::aes(y = ggplot2::after_stat(density)),
-                            bins = 30, alpha = 0.7,
+                            bins = adaptive_histogram_bins(posterior_draws),
+                            alpha = 0.7,
                             fill = "lightblue", color = "darkblue") +
     ggplot2::geom_density(color = "red", linewidth = 1.2, adjust = 1.5)
 
@@ -940,24 +1110,26 @@ arrange_completed_summary_panels <- function(panel_grobs, title_text) {
 
 #' Plot completed dataset summary panels
 #' @param x bayesian_imputation object
-#' @param dataset_id Specific dataset to plot (NULL for random)
+#' @param dataset_id Specific dataset to plot (NULL for first completed dataset)
 #' @param panels Which panels to display. Use `"auto"` for default 4-panel layout,
 #'   or any combination of `c("hist", "density", "survival", "boxplot")`.
 #' @param ... Additional arguments
 #' @return ggplot object
 #' @keywords internal
-plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto", palette = NULL, color = NULL, ...) {
+plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto", palette = NULL, color = NULL,
+                                           density_scale = c("auto", "time", "log"), ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
   }
   
   palette_map <- resolve_single_plot_palette(palette = palette, color = color, context = "completed_dataset_summary")
+  density_scale <- match.arg(density_scale)
 
   n_datasets <- length(x$imputed_datasets)
   selected_indices <- validate_dataset_indices(dataset_id, n_datasets)
   if (is.null(selected_indices)) {
-    selected_indices <- sample(seq_len(n_datasets), 1)
+    selected_indices <- 1L
   }
   selected_indices <- sort(selected_indices)
 
@@ -994,13 +1166,21 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
   if ("hist" %in% selected_panels) {
     if (is_multi) {
       p_hist <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, fill = .dataset)) +
-        ggplot2::geom_histogram(bins = 30, alpha = 0.45, position = "identity") +
+        ggplot2::geom_histogram(
+          bins = adaptive_histogram_bins(all_data$.time),
+          alpha = 0.45,
+          position = "identity"
+        ) +
         ggplot2::scale_fill_manual(values = multi_colors, name = "Imputed dataset") +
-        ggplot2::labs(title = "Histogram", x = "Time", y = "Count")
+        ggplot2::labs(title = "Histogram", x = time_axis_label(x), y = "Count")
     } else {
       p_hist <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
-        ggplot2::geom_histogram(bins = 30, fill = palette_map[["hist_fill"]], alpha = 0.7) +
-        ggplot2::labs(title = "Histogram", x = "Time", y = "Count")
+        ggplot2::geom_histogram(
+          bins = adaptive_histogram_bins(dataset[[time_var]]),
+          fill = palette_map[["hist_fill"]],
+          alpha = 0.7
+        ) +
+        ggplot2::labs(title = "Histogram", x = time_axis_label(x), y = "Count")
     }
     p_hist <- style_bird_plot(
       p_hist,
@@ -1015,33 +1195,11 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
     if (is_multi) {
       density_data <- data.frame()
       pooled <- all_data$.time[is.finite(all_data$.time) & all_data$.time >= 0]
-      pooled <- pmax(pooled, .Machine$double.eps)
-      qlo <- max(0, stats::quantile(pooled, 0.005, na.rm = TRUE))
-      qhi <- stats::quantile(pooled, 0.995, na.rm = TRUE)
-      if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
-        qlo <- min(pooled, na.rm = TRUE)
-        qhi <- max(pooled, na.rm = TRUE)
-      }
-      x_grid <- seq(qlo, qhi, length.out = 400)
+      x_grid <- density_plot_grid(pooled, n = 400)
 
       for (i in selected_indices) {
         vals <- x$imputed_datasets[[i]][[time_var]]
-        vals <- vals[is.finite(vals) & vals >= 0]
-        vals <- pmax(vals, .Machine$double.eps)
-        y_density <- NULL
-        if (requireNamespace("logspline", quietly = TRUE)) {
-          ls_fit <- tryCatch(
-            logspline::logspline(vals, lbound = 0, maxknots = 6),
-            error = function(e) tryCatch(logspline::logspline(vals, lbound = 0), error = function(e2) NULL)
-          )
-          if (!is.null(ls_fit)) {
-            y_density <- logspline::dlogspline(x_grid, ls_fit)
-          }
-        }
-        if (is.null(y_density)) {
-          dens <- stats::density(vals, from = min(x_grid), to = max(x_grid), n = length(x_grid))
-          y_density <- stats::approx(dens$x, dens$y, xout = x_grid, rule = 2)$y
-        }
+        y_density <- logspline_density_on_grid(vals, x_grid, density_scale = density_scale)
         density_data <- rbind(
           density_data,
           data.frame(x = x_grid, y = y_density, .dataset = factor(paste("Dataset", i), levels = multi_labels), stringsAsFactors = FALSE)
@@ -1051,7 +1209,7 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
       p_density <- ggplot2::ggplot(density_data, ggplot2::aes(x = x, y = y, color = .dataset)) +
         ggplot2::geom_line(linewidth = 1, alpha = 0.9) +
         ggplot2::scale_color_manual(values = multi_colors, name = "Imputed dataset") +
-        ggplot2::labs(title = "Density", x = "Time", y = "Density")
+        ggplot2::labs(title = "Density", x = time_axis_label(x), y = "Density")
       p_density <- style_bird_plot(
         p_density,
         legend_position = if (is_multi) c(0.98, 0.98) else "none",
@@ -1061,51 +1219,23 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
     } else if (requireNamespace("logspline", quietly = TRUE)) {
       x_vals <- dataset[[time_var]]
       x_vals <- x_vals[is.finite(x_vals) & x_vals >= 0]
-      x_vals <- pmax(x_vals, .Machine$double.eps)
-
-      ls_fit <- tryCatch(
-        logspline::logspline(x_vals, lbound = 0, maxknots = 6),
-        error = function(e) tryCatch(
-          logspline::logspline(x_vals, lbound = 0),
-          error = function(e2) NULL
-        )
-      )
 
       orig_times <- x$original_data[[x$time_col]]
       orig_status <- x$original_data[[x$status_col]]
       orig_events <- orig_times[is.finite(orig_times) & orig_times >= 0 & orig_status == 1]
       all_times <- c(orig_events, dataset[[time_var]])
       all_times <- all_times[is.finite(all_times) & all_times >= 0]
-      all_times <- pmax(all_times, .Machine$double.eps)
-
-      if (length(all_times) >= 2) {
-        qlo <- max(0, stats::quantile(all_times, 0.005, na.rm = TRUE))
-        qhi <- stats::quantile(all_times, 0.995, na.rm = TRUE)
-      } else {
-        qlo <- min(all_times, na.rm = TRUE)
-        qhi <- max(all_times, na.rm = TRUE)
-      }
-      if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
-        qlo <- min(all_times, na.rm = TRUE)
-        qhi <- max(all_times, na.rm = TRUE)
-      }
-      x_grid <- seq(qlo, qhi, length.out = 400)
-
-      if (!is.null(ls_fit)) {
-        y_density <- logspline::dlogspline(x_grid, ls_fit)
-      } else {
-        dens <- stats::density(x_vals, from = min(x_grid), to = max(x_grid), n = length(x_grid))
-        y_density <- stats::approx(dens$x, dens$y, xout = x_grid, rule = 2)$y
-      }
+      x_grid <- density_plot_grid(all_times, n = 400)
+      y_density <- logspline_density_on_grid(x_vals, x_grid, density_scale = density_scale)
 
       p_density <- ggplot2::ggplot(data.frame(x = x_grid, y = y_density), ggplot2::aes(x = x, y = y)) +
         ggplot2::geom_line(color = palette_map[["density_line"]], linewidth = 1) +
-        ggplot2::labs(title = "Density", x = "Time", y = "Density")
+        ggplot2::labs(title = "Density", x = time_axis_label(x), y = "Density")
       p_density <- style_bird_plot(p_density, legend_position = "none", base_size = 11)
     } else {
       p_density <- ggplot2::ggplot(dataset, ggplot2::aes(x = .data[[time_var]])) +
         ggplot2::geom_density(fill = palette_map[["density_fill"]], alpha = 0.7) +
-        ggplot2::labs(title = "Density", x = "Time", y = "Density")
+        ggplot2::labs(title = "Density", x = time_axis_label(x), y = "Density")
       p_density <- style_bird_plot(p_density, legend_position = "none", base_size = 11)
     }
     panel_grobs$density <- p_density
@@ -1120,27 +1250,25 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
             as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
             data = x$imputed_datasets[[i]]
           )
-          data.frame(
-            time = km$time,
-            survival = km$surv,
+          km_survival_plot_data(
+            km,
             .dataset = factor(paste("Dataset", i), levels = multi_labels),
-            stringsAsFactors = FALSE
           )
         })
       )
       p_survival <- ggplot2::ggplot(surv_data, ggplot2::aes(x = time, y = survival, color = .dataset)) +
         ggplot2::geom_step(linewidth = 1) +
         ggplot2::scale_color_manual(values = multi_colors, name = "Imputed dataset") +
-        ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability")
+        ggplot2::labs(title = "Survival Curve", x = time_axis_label(x), y = "Survival Probability")
     } else {
       km_fit <- survival::survfit(
         as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
         data = dataset
       )
-      p_survival <- ggplot2::ggplot(data.frame(time = km_fit$time, survival = km_fit$surv),
+      p_survival <- ggplot2::ggplot(km_survival_plot_data(km_fit),
                                     ggplot2::aes(x = time, y = survival)) +
         ggplot2::geom_step(color = palette_map[["survival_curve"]], linewidth = 1) +
-        ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability")
+        ggplot2::labs(title = "Survival Curve", x = time_axis_label(x), y = "Survival Probability")
     }
     p_survival <- style_bird_plot(
       p_survival,
@@ -1156,11 +1284,11 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
       p_boxplot <- ggplot2::ggplot(all_data, ggplot2::aes(x = .dataset, y = .time, fill = .dataset)) +
         ggplot2::geom_boxplot(alpha = 0.7) +
         ggplot2::scale_fill_manual(values = multi_colors, name = "Imputed dataset") +
-        ggplot2::labs(title = "Boxplot", x = "Dataset", y = "Survival Time")
+        ggplot2::labs(title = "Boxplot", x = "Dataset", y = time_axis_label(x, "Survival time"))
     } else {
       p_boxplot <- ggplot2::ggplot(dataset, ggplot2::aes(x = "", y = .data[[time_var]])) +
         ggplot2::geom_boxplot(fill = palette_map[["box_fill"]], alpha = 0.7) +
-        ggplot2::labs(title = "Boxplot", x = "", y = "Survival Time")
+        ggplot2::labs(title = "Boxplot", x = "", y = time_axis_label(x, "Survival time"))
     }
     p_boxplot <- style_bird_plot(
       p_boxplot,
@@ -1195,13 +1323,15 @@ plot_completed_dataset_summary <- function(x, dataset_id = NULL, panels = "auto"
 #' @param ... Additional arguments
 #' @keywords internal
 plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels = "auto", alpha = 0.6,
-                                                  group_colors = NULL, ...) {
+                                                  group_colors = NULL,
+                                                  density_scale = c("auto", "time", "log"), ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
   }
   
   n_by_group <- vapply(x$group_results, function(g) length(g$imputed_datasets), integer(1))
+  density_scale <- match.arg(density_scale)
   ids_by_group <- resolve_comparison_dataset_ids(
     dataset_id = dataset_id,
     keys = x$group_names,
@@ -1219,7 +1349,7 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
   }
   
   # Combine all datasets for plotting
-  all_data <- do.call(rbind, group_datasets)
+  all_data <- bind_rows_fill(group_datasets)
   time_var <- x$group_results[[1]]$time_col
   status_var <- x$group_results[[1]]$status_col
   
@@ -1245,9 +1375,13 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
 
   if ("hist" %in% selected_panels) {
     p_hist <- ggplot2::ggplot(all_data, ggplot2::aes(x = .data[[time_var]], fill = group)) +
-      ggplot2::geom_histogram(bins = 30, alpha = alpha, position = "identity") +
+      ggplot2::geom_histogram(
+        bins = adaptive_histogram_bins(all_data[[time_var]]),
+        alpha = alpha,
+        position = "identity"
+      ) +
       ggplot2::scale_fill_manual(values = group_color_map) +
-      ggplot2::labs(title = "Histogram", x = "Time", y = "Count", fill = "Group")
+      ggplot2::labs(title = "Histogram", x = time_axis_label(x), y = "Count", fill = "Group")
     p_hist <- style_bird_plot(p_hist, base_size = 11)
     panel_grobs$hist <- p_hist
   }
@@ -1261,41 +1395,13 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
       orig_events <- orig_times[is.finite(orig_times) & orig_times >= 0 & orig_status == 1]
       pooled_times <- c(orig_events, all_data[[time_var]])
       pooled_times <- pooled_times[is.finite(pooled_times) & pooled_times >= 0]
-      pooled_times <- pmax(pooled_times, .Machine$double.eps)
-
-      if (length(pooled_times) >= 2) {
-        qlo <- max(0, stats::quantile(pooled_times, 0.005, na.rm = TRUE))
-        qhi <- stats::quantile(pooled_times, 0.995, na.rm = TRUE)
-      } else {
-        qlo <- min(pooled_times, na.rm = TRUE)
-        qhi <- max(pooled_times, na.rm = TRUE)
-      }
-      if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
-        qlo <- min(pooled_times, na.rm = TRUE)
-        qhi <- max(pooled_times, na.rm = TRUE)
-      }
-      x_grid <- seq(qlo, qhi, length.out = 400)
+      x_grid <- density_plot_grid(pooled_times, n = 400)
 
       density_data <- data.frame()
       for (group_name in x$group_names) {
         group_data <- group_datasets[[group_name]]
         x_vals <- group_data[[time_var]]
-        x_vals <- x_vals[is.finite(x_vals) & x_vals >= 0]
-        x_vals <- pmax(x_vals, .Machine$double.eps)
-        ls_fit <- tryCatch(
-          logspline::logspline(x_vals, lbound = 0, maxknots = 6),
-          error = function(e) tryCatch(
-            logspline::logspline(x_vals, lbound = 0),
-            error = function(e2) NULL
-          )
-        )
-
-        if (!is.null(ls_fit)) {
-          y_density <- logspline::dlogspline(x_grid, ls_fit)
-        } else {
-          dens <- stats::density(x_vals, from = min(x_grid), to = max(x_grid), n = length(x_grid))
-          y_density <- stats::approx(dens$x, dens$y, xout = x_grid, rule = 2)$y
-        }
+        y_density <- logspline_density_on_grid(x_vals, x_grid, density_scale = density_scale)
 
         density_data <- rbind(density_data, data.frame(
           x = x_grid,
@@ -1308,13 +1414,13 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
       p_density <- ggplot2::ggplot(density_data, ggplot2::aes(x = x, y = y, color = group)) +
         ggplot2::geom_line(linewidth = 1, alpha = alpha) +
         ggplot2::scale_color_manual(values = group_color_map) +
-        ggplot2::labs(title = "Density", x = "Time", y = "Density", color = "Group")
+        ggplot2::labs(title = "Density", x = time_axis_label(x), y = "Density", color = "Group")
       p_density <- style_bird_plot(p_density, base_size = 11)
     } else {
       p_density <- ggplot2::ggplot(all_data, ggplot2::aes(x = .data[[time_var]], fill = group)) +
         ggplot2::geom_density(alpha = alpha) +
         ggplot2::scale_fill_manual(values = group_color_map) +
-        ggplot2::labs(title = "Density", x = "Time", y = "Density", fill = "Group")
+        ggplot2::labs(title = "Density", x = time_axis_label(x), y = "Density", fill = "Group")
       p_density <- style_bird_plot(p_density, base_size = 11)
     }
     panel_grobs$density <- p_density
@@ -1328,17 +1434,15 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
         as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
         data = group_data
       )
-      survival_data <- rbind(survival_data, data.frame(
-        time = km_fit$time,
-        survival = km_fit$surv,
-        group = group_name,
-        stringsAsFactors = FALSE
-      ))
+      survival_data <- rbind(
+        survival_data,
+        km_survival_plot_data(km_fit, group = group_name)
+      )
     }
     p_survival <- ggplot2::ggplot(survival_data, ggplot2::aes(x = time, y = survival, color = group)) +
       ggplot2::geom_step(linewidth = 1, alpha = alpha) +
       ggplot2::scale_color_manual(values = group_color_map) +
-      ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability", color = "Group")
+      ggplot2::labs(title = "Survival Curve", x = time_axis_label(x), y = "Survival Probability", color = "Group")
     p_survival <- style_bird_plot(p_survival, base_size = 11)
     panel_grobs$survival <- p_survival
   }
@@ -1347,16 +1451,15 @@ plot_completed_dataset_summary_groups <- function(x, dataset_id = NULL, panels =
     p_boxplot <- ggplot2::ggplot(all_data, ggplot2::aes(x = group, y = .data[[time_var]], fill = group)) +
       ggplot2::geom_boxplot(alpha = alpha) +
       ggplot2::scale_fill_manual(values = group_color_map) +
-      ggplot2::labs(title = "Boxplots", x = "Group", y = "Survival Time", fill = "Group")
+      ggplot2::labs(title = "Boxplots", x = "Group", y = time_axis_label(x, "Survival time"), fill = "Group")
     p_boxplot <- style_bird_plot(p_boxplot, legend_position = "none", base_size = 11)
     panel_grobs$boxplot <- p_boxplot
   }
 
   ordered_panels <- panel_grobs[selected_panels]
-  subtitle_map <- paste0(names(ids_by_group), "=", as.integer(ids_by_group), collapse = ", ")
   arrange_completed_summary_panels(
     ordered_panels,
-    paste("Completed Dataset Summary - Group Comparison (", subtitle_map, ")", sep = "")
+    paste("Completed Dataset Summary - Group Comparison (", selected_dataset_label(ids_by_group), ")", sep = "")
   )
 }
 
@@ -1388,7 +1491,7 @@ plot_survival_curves_models <- function(x, show_original = TRUE, n_grid = 200, a
     stop("Not enough finite times found to build survival comparison")
   }
 
-  t_min <- min(all_times)
+  t_min <- 0
   t_max <- max(all_times)
   if (!is.finite(t_min) || !is.finite(t_max)) {
     stop("Could not determine plotting range for model comparison")
@@ -1452,7 +1555,7 @@ plot_survival_curves_models <- function(x, show_original = TRUE, n_grid = 200, a
     ggplot2::labs(
       title = "Survival Curve Comparison Across Models",
       subtitle = "Line: mean survival across completed datasets | Ribbon: 95% interval",
-      x = paste0("Time (", x$model_info$time_unit, ")"),
+      x = time_axis_label(x),
       y = "Survival probability",
       color = "Model",
       fill = "Model"
@@ -1463,7 +1566,7 @@ plot_survival_curves_models <- function(x, show_original = TRUE, n_grid = 200, a
       as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
       data = x$original_data
     )
-    orig_df <- data.frame(time = km_orig$time, survival = km_orig$surv)
+    orig_df <- km_survival_plot_data(km_orig)
     p <- p + ggplot2::geom_step(
       data = orig_df,
       ggplot2::aes(x = time, y = survival),
@@ -1559,7 +1662,7 @@ plot_boxplots_comparison_models <- function(x, n_max = 10, dataset_id = NULL, da
       ggplot2::labs(
         title = paste0("Model: ", nm),
         subtitle = paste("Boxplots for", length(dataset_indices), "datasets"),
-        x = "Survival Time",
+        x = time_axis_label(x, "Survival time"),
         y = "Imputed Dataset"
       )
     p <- style_bird_plot(p, legend_position = "none", base_size = 11)
@@ -1580,9 +1683,11 @@ plot_boxplots_comparison_models <- function(x, n_max = 10, dataset_id = NULL, da
 #'   using a named vector (e.g. `c(weibull = 3, nonparametric = 5)`)
 #'   or unnamed vector in model order.
 #' @param model_colors Optional named/un-named vector of colors for models
+#' @param alpha Line transparency for overlaid model densities
 #' @param ... Additional arguments (unused)
 #' @keywords internal
-plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = NULL, ...) {
+plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = NULL, alpha = 0.9,
+                                           density_scale = c("auto", "time", "log"), ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
   }
@@ -1591,6 +1696,7 @@ plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = 
   }
 
   model_names <- x$model_names
+  density_scale <- match.arg(density_scale)
   color_map <- resolve_model_colors(model_names, model_colors)
   time_var <- x$time_col
 
@@ -1614,34 +1720,16 @@ plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = 
     stop("Need at least two selected imputed times to compute model density comparison")
   }
 
-  x_range <- range(selected_times, finite = TRUE)
-  x_range[1] <- max(0, x_range[1])
-  x_grid <- seq(x_range[1], x_range[2], length.out = 300)
+  x_grid <- density_plot_grid(selected_times, n = 300)
 
   density_on_grid <- function(values, grid) {
-    values <- values[is.finite(values)]
-    if (length(values) < 2) {
-      return(rep(NA_real_, length(grid)))
-    }
-    ls_fit <- tryCatch(
-      logspline::logspline(values, lbound = 0, maxknots = 6),
-      error = function(e) tryCatch(
-        logspline::logspline(values, lbound = 0),
-        error = function(e2) NULL
-      )
-    )
-    if (!is.null(ls_fit)) {
-      return(logspline::dlogspline(grid, ls_fit))
-    }
-    dens <- stats::density(values, from = min(grid), to = max(grid), n = length(grid))
-    stats::approx(dens$x, dens$y, xout = grid, rule = 2)$y
+    logspline_density_on_grid(values, grid, density_scale = density_scale)
   }
 
   plot_data <- data.frame()
   for (nm in model_names) {
     vals <- x$model_results[[nm]]$imputed_datasets[[ids_by_model[[nm]]]][[time_var]]
     vals <- vals[is.finite(vals) & vals >= 0]
-    vals <- pmax(vals, .Machine$double.eps)
     if (length(vals) < 2) next
     plot_data <- rbind(plot_data, data.frame(
       x = x_grid,
@@ -1658,12 +1746,12 @@ plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = 
   }
 
   p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = model)) +
-    ggplot2::geom_line(linewidth = 1) +
+    ggplot2::geom_line(linewidth = 1, alpha = alpha) +
     ggplot2::scale_color_manual(values = color_map) +
     ggplot2::labs(
       title = "Density Comparison Across Models",
       subtitle = sub_txt,
-      x = paste0("Time (", x$model_info$time_unit %||% "days", ")"),
+      x = time_axis_label(x),
       y = "Density",
       color = NULL
     )
@@ -1688,7 +1776,8 @@ plot_density_comparison_models <- function(x, dataset_id = NULL, model_colors = 
 #' @param model_colors Optional named/un-named vector of colors for models
 #' @param ... Additional arguments (unused)
 #' @keywords internal
-plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels = "auto", alpha = 0.55, model_colors = NULL, ...) {
+plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels = "auto", alpha = 0.55, model_colors = NULL,
+                                                  density_scale = c("auto", "time", "log"), ...) {
   if (!requireNamespace("gridExtra", quietly = TRUE)) {
     stop("gridExtra package required for arranging plots")
   }
@@ -1697,6 +1786,7 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels =
   }
 
   model_names <- x$model_names
+  density_scale <- match.arg(density_scale)
   n_models <- length(model_names)
   color_map <- resolve_model_colors(model_names, model_colors)
   time_var <- x$time_col
@@ -1751,9 +1841,13 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels =
 
   if ("hist" %in% selected_panels) {
     p_hist <- ggplot2::ggplot(all_data, ggplot2::aes(x = .time, fill = .model)) +
-      ggplot2::geom_histogram(bins = 30, alpha = alpha, position = "identity") +
+      ggplot2::geom_histogram(
+        bins = adaptive_histogram_bins(all_data$.time),
+        alpha = alpha,
+        position = "identity"
+      ) +
       ggplot2::scale_fill_manual(values = color_map) +
-      ggplot2::labs(title = "Histogram", x = "Time", y = "Count", fill = "Model")
+      ggplot2::labs(title = "Histogram", x = time_axis_label(x), y = "Count", fill = "Model")
     p_hist <- style_bird_plot(p_hist, base_size = 11)
     panel_grobs$hist <- p_hist
   }
@@ -1762,44 +1856,13 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels =
     # Use logspline curves (line-only) for consistency with group comparison style.
     pooled_times <- c(all_data$.time, x$original_data[[time_var]][x$original_data[[status_var]] == 1])
     pooled_times <- pooled_times[is.finite(pooled_times) & pooled_times >= 0]
-    pooled_times <- pmax(pooled_times, .Machine$double.eps)
-
-    if (length(pooled_times) >= 2) {
-      qlo <- max(0, stats::quantile(pooled_times, 0.005, na.rm = TRUE))
-      qhi <- stats::quantile(pooled_times, 0.995, na.rm = TRUE)
-    } else {
-      qlo <- min(pooled_times, na.rm = TRUE)
-      qhi <- max(pooled_times, na.rm = TRUE)
-    }
-    if (!is.finite(qlo) || !is.finite(qhi) || qhi <= qlo) {
-      qlo <- min(pooled_times, na.rm = TRUE)
-      qhi <- max(pooled_times, na.rm = TRUE)
-    }
-    x_grid <- seq(qlo, qhi, length.out = 400)
+    x_grid <- density_plot_grid(pooled_times, n = 400)
 
     density_data <- data.frame()
     for (nm in model_names) {
       model_vals <- model_datasets[[nm]][[time_var]]
       model_vals <- model_vals[is.finite(model_vals) & model_vals >= 0]
-      model_vals <- pmax(model_vals, .Machine$double.eps)
-
-      y_density <- NULL
-      if (requireNamespace("logspline", quietly = TRUE)) {
-        ls_fit <- tryCatch(
-          logspline::logspline(model_vals, lbound = 0, maxknots = 6),
-          error = function(e) tryCatch(
-            logspline::logspline(model_vals, lbound = 0),
-            error = function(e2) NULL
-          )
-        )
-        if (!is.null(ls_fit)) {
-          y_density <- logspline::dlogspline(x_grid, ls_fit)
-        }
-      }
-      if (is.null(y_density)) {
-        dens <- stats::density(model_vals, from = min(x_grid), to = max(x_grid), n = length(x_grid))
-        y_density <- stats::approx(dens$x, dens$y, xout = x_grid, rule = 2)$y
-      }
+      y_density <- logspline_density_on_grid(model_vals, x_grid, density_scale = density_scale)
 
       density_data <- rbind(density_data, data.frame(
         x = x_grid,
@@ -1812,7 +1875,7 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels =
     p_density <- ggplot2::ggplot(density_data, ggplot2::aes(x = x, y = y, color = model)) +
       ggplot2::geom_line(linewidth = 1, alpha = alpha) +
       ggplot2::scale_color_manual(values = color_map) +
-      ggplot2::labs(title = "Density", x = "Time", y = "Density", color = "Model")
+      ggplot2::labs(title = "Density", x = time_axis_label(x), y = "Density", color = "Model")
     p_density <- style_bird_plot(p_density, base_size = 11)
     panel_grobs$density <- p_density
   }
@@ -1825,18 +1888,16 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels =
         as.formula(paste("survival::Surv(", time_var, ",", status_var, ") ~ 1")),
         data = d
       )
-      surv_data <- rbind(surv_data, data.frame(
-        time = km$time,
-        survival = km$surv,
-        model = nm,
-        stringsAsFactors = FALSE
-      ))
+      surv_data <- rbind(
+        surv_data,
+        km_survival_plot_data(km, model = nm)
+      )
     }
 
     p_survival <- ggplot2::ggplot(surv_data, ggplot2::aes(x = time, y = survival, color = model)) +
       ggplot2::geom_step(linewidth = 1) +
       ggplot2::scale_color_manual(values = color_map) +
-      ggplot2::labs(title = "Survival Curve", x = "Time", y = "Survival Probability", color = "Model")
+      ggplot2::labs(title = "Survival Curve", x = time_axis_label(x), y = "Survival Probability", color = "Model")
     p_survival <- style_bird_plot(p_survival, base_size = 11)
     panel_grobs$survival <- p_survival
   }
@@ -1845,16 +1906,15 @@ plot_completed_dataset_summary_models <- function(x, dataset_id = NULL, panels =
     p_boxplot <- ggplot2::ggplot(all_data, ggplot2::aes(x = .model, y = .time, fill = .model)) +
       ggplot2::geom_boxplot(alpha = alpha) +
       ggplot2::scale_fill_manual(values = color_map) +
-      ggplot2::labs(title = "Boxplots", x = "Model", y = "Survival Time", fill = "Model")
+      ggplot2::labs(title = "Boxplots", x = "Model", y = time_axis_label(x, "Survival time"), fill = "Model")
     p_boxplot <- style_bird_plot(p_boxplot, legend_position = "none", base_size = 11)
     panel_grobs$boxplot <- p_boxplot
   }
 
   ordered_panels <- panel_grobs[selected_panels]
-  subtitle_map <- paste0(names(ids_by_model), "=", as.integer(ids_by_model), collapse = ", ")
   arrange_completed_summary_panels(
     ordered_panels,
-    paste("Completed Dataset Summary - Model Comparison (", subtitle_map, ")", sep = "")
+    paste("Completed Dataset Summary - Model Comparison (", selected_dataset_label(ids_by_model), ")", sep = "")
   )
 }
 
@@ -1901,13 +1961,14 @@ survival_step_at_grid <- function(km, grid) {
 
 #' Plot imputed density using logspline
 #' @param x bayesian_imputation object
-#' @param dataset_id Dataset index to use for the imputed density curve (NULL for random)
+#' @param dataset_id Dataset index to use for the imputed density curve (NULL for first completed dataset)
 #' @param n_curves Deprecated and ignored (kept for backward compatibility)
 #' @param alpha Deprecated and ignored (kept for backward compatibility)
 #' @param ... Additional arguments
 #' @return ggplot object
 #' @keywords internal
-plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha = 0.3, palette = NULL, color = NULL, ...) {
+plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha = 0.3, palette = NULL, color = NULL,
+                                    density_scale = c("auto", "time", "log"), ...) {
   
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
@@ -1918,6 +1979,7 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
   }
 
   palette_map <- resolve_single_plot_palette(palette = palette, color = color, context = "density")
+  density_scale <- match.arg(density_scale)
   
   time_var <- x$time_col
   n_datasets <- length(x$imputed_datasets)
@@ -1927,7 +1989,7 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
   
   selected_indices <- validate_dataset_indices(dataset_id, n_datasets)
   if (is.null(selected_indices)) {
-    selected_indices <- sample(seq_len(n_datasets), 1)
+    selected_indices <- 1L
   }
   selected_indices <- sort(selected_indices)
   
@@ -1943,25 +2005,10 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
     stop("Need at least two finite non-negative times to compute density plot")
   }
 
-  x_range <- range(all_selected_values, finite = TRUE)
-  x_range[1] <- max(0, x_range[1])
-  x_grid <- seq(x_range[1], x_range[2], length.out = 200)
+  x_grid <- density_plot_grid(all_selected_values, n = 200)
   
   density_on_grid <- function(values, grid) {
-    ls_fit <- tryCatch(
-      logspline::logspline(values, lbound = 0, maxknots = 6),
-      error = function(e) tryCatch(
-        logspline::logspline(values, lbound = 0),
-        error = function(e2) NULL
-      )
-    )
-    
-    if (!is.null(ls_fit)) {
-      return(logspline::dlogspline(grid, ls_fit))
-    }
-    
-    dens <- stats::density(values, from = min(grid), to = max(grid), n = length(grid))
-    stats::approx(dens$x, dens$y, xout = grid, rule = 2)$y
+    logspline_density_on_grid(values, grid, density_scale = density_scale)
   }
   
   if (length(selected_indices) == 1) {
@@ -1987,14 +2034,13 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
   }
   
   # Create plot 
-  time_unit <- x$model_info$time_unit %||% "days"
   if (length(selected_indices) == 1) {
     p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y)) +
       ggplot2::geom_line(linewidth = 1, color = palette_map[["density_line"]]) +
       ggplot2::labs(
         title = NULL,
         subtitle = NULL,
-        x = paste0("Time (", time_unit, ")"),
+        x = time_axis_label(x),
         y = "Density"
       )
   } else {
@@ -2005,7 +2051,7 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
       ggplot2::labs(
         title = NULL,
         subtitle = NULL,
-        x = paste0("Time (", time_unit, ")"),
+        x = time_axis_label(x),
         y = "Density"
       )
   }
@@ -2033,11 +2079,12 @@ plot_density_comparison <- function(x, dataset_id = NULL, n_curves = NULL, alpha
 #' @param n_curves Number of imputed curves to show per group (default: 10)
 #' @param alpha Transparency for imputed curves (default: 0.3)
 #' @param show_original Whether to show original KM curves (default: TRUE)
+#' @param show_median Whether to show dotted median survival guide lines (default: FALSE)
 #' @param combine_groups Whether to show all groups on same plot (TRUE) or separate plots (FALSE)
 #' @param ... Additional arguments
 #' @keywords internal
 plot_survival_curves_by_group_safe <- function(x, n_curves = 10, alpha = 0.3, show_original = TRUE,
-                                               combine_groups = TRUE, ...) {
+                                               show_median = FALSE, combine_groups = TRUE, ...) {
   
   if (!requireNamespace("survival", quietly = TRUE)) {
     stop("survival package required for Kaplan-Meier curves")
@@ -2061,10 +2108,10 @@ plot_survival_curves_by_group_safe <- function(x, n_curves = 10, alpha = 0.3, sh
   
   if (combine_groups) {
     # Combined plot - all groups on same plot
-    return(plot_survival_curves_combined(x, n_curves, alpha, show_original, group_colors, ...))
+    return(plot_survival_curves_combined(x, n_curves, alpha, show_original, show_median, group_colors, ...))
   } else {
     # Separate plots - one plot per group
-    return(plot_survival_curves_separate(x, n_curves, alpha, show_original, group_colors, ...))
+    return(plot_survival_curves_separate(x, n_curves, alpha, show_original, show_median, group_colors, ...))
   }
 }
 
@@ -2073,10 +2120,11 @@ plot_survival_curves_by_group_safe <- function(x, n_curves = 10, alpha = 0.3, sh
 #' @param n_curves Number of curves per group
 #' @param alpha Transparency
 #' @param show_original Whether to show original curves
+#' @param show_median Whether to show dotted median survival guide lines
 #' @param group_colors Color palette
 #' @param ... Additional arguments
 #' @keywords internal
-plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, group_colors, ...) {
+plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, show_median, group_colors, ...) {
   group_color_map <- resolve_group_colors(x$group_names, group_colors)
   
   # Collect all plot data
@@ -2103,11 +2151,7 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
       )
       
       # Store KM curve
-      all_km_curves[[i]] <- data.frame(
-        time = km_temp$time,
-        survival = km_temp$surv,
-        stringsAsFactors = FALSE
-      )
+      all_km_curves[[i]] <- km_survival_plot_data(km_temp)
       
       # Calculate median survival time
       median_idx <- which(km_temp$surv <= 0.5)[1]
@@ -2136,14 +2180,12 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
         data = group_result$original_data
       )
       
-      orig_df <- data.frame(
-        time = km_orig$time,
-        survival = km_orig$surv,
+      orig_df <- km_survival_plot_data(
+        km_orig,
         group = group_name,
         type = "KM estimation",
         dataset_id = 0,
-        legend_label = "KM estimation",
-        stringsAsFactors = FALSE
+        legend_label = "KM estimation"
       )
       all_plot_data <- rbind(all_plot_data, orig_df)
     }
@@ -2159,14 +2201,12 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
         data = selected_datasets[[j]]
       )
       
-      imp_df <- data.frame(
-        time = km_imp$time,
-        survival = km_imp$surv,
+      imp_df <- km_survival_plot_data(
+        km_imp,
         group = group_name,
         type = "Bayesian imputation",
         dataset_id = j,
-        legend_label = paste0("Bayesian imputation (group = ", group_name, ")"),
-        stringsAsFactors = FALSE
+        legend_label = paste0("Bayesian imputation (group = ", group_name, ")")
       )
       all_plot_data <- rbind(all_plot_data, imp_df)
     }
@@ -2193,26 +2233,30 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
                       linewidth = 0.7)
   }
   
+  # Add optional median survival guide lines
+  if (isTRUE(show_median)) {
+    p <- p +
+      ggplot2::geom_segment(data = data.frame(
+        legend_label = paste0("Bayesian imputation (group = ", names(median_stats), ")"),
+        median_time = sapply(median_stats, function(x) x$mean_median),
+        x_start = 0,
+        y_start = 0.5,
+        x_end = sapply(median_stats, function(x) x$mean_median),
+        y_end = 0.5
+      ), ggplot2::aes(x = x_start, y = y_start, xend = x_end, yend = y_end, color = legend_label), 
+      linetype = "dotted", linewidth = 0.8, alpha = 0.7) +
+      ggplot2::geom_segment(data = data.frame(
+        legend_label = paste0("Bayesian imputation (group = ", names(median_stats), ")"),
+        median_time = sapply(median_stats, function(x) x$mean_median),
+        x_start = sapply(median_stats, function(x) x$mean_median),
+        y_start = 0.5,
+        x_end = sapply(median_stats, function(x) x$mean_median),
+        y_end = 0
+      ), ggplot2::aes(x = x_start, y = y_start, xend = x_end, yend = y_end, color = legend_label), 
+      linetype = "dotted", linewidth = 0.8, alpha = 0.7)
+  }
+  
   p <- p +
-    # Add median survival lines (horizontal from y=0.5 to curve, then vertical to x-axis)
-    ggplot2::geom_segment(data = data.frame(
-      legend_label = paste0("Bayesian imputation (group = ", names(median_stats), ")"),
-      median_time = sapply(median_stats, function(x) x$mean_median),
-      x_start = 0,
-      y_start = 0.5,
-      x_end = sapply(median_stats, function(x) x$mean_median),
-      y_end = 0.5
-    ), ggplot2::aes(x = x_start, y = y_start, xend = x_end, yend = y_end, color = legend_label), 
-    linetype = "dotted", linewidth = 0.8, alpha = 0.7) +
-    ggplot2::geom_segment(data = data.frame(
-      legend_label = paste0("Bayesian imputation (group = ", names(median_stats), ")"),
-      median_time = sapply(median_stats, function(x) x$mean_median),
-      x_start = sapply(median_stats, function(x) x$mean_median),
-      y_start = 0.5,
-      x_end = sapply(median_stats, function(x) x$mean_median),
-      y_end = 0
-    ), ggplot2::aes(x = x_start, y = y_start, xend = x_end, yend = y_end, color = legend_label), 
-    linetype = "dotted", linewidth = 0.8, alpha = 0.7) +
     # Color scheme: group colors for imputed, black for KM
     ggplot2::scale_color_manual(
       values = c(
@@ -2224,7 +2268,7 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
     ggplot2::labs(
       title = paste0("Bayesian Imputation (n = ", actual_curves_per_group, ") vs Kaplan-Meier by Group"),
       subtitle = NULL,
-      x = paste0("Time (", x$group_results[[1]]$model_info$time_unit %||% "days", ")"),
+      x = time_axis_label(x),
       y = "Survival probability",
       caption = paste("Median survival times: ", 
                      paste(sapply(names(median_stats), function(g) {
@@ -2259,10 +2303,11 @@ plot_survival_curves_combined <- function(x, n_curves, alpha, show_original, gro
 #' @param n_curves Number of curves per group
 #' @param alpha Transparency
 #' @param show_original Whether to show original curves
+#' @param show_median Whether to show dotted median survival guide lines
 #' @param group_colors Color palette
 #' @param ... Additional arguments
 #' @keywords internal
-plot_survival_curves_separate <- function(x, n_curves, alpha, show_original, group_colors, ...) {
+plot_survival_curves_separate <- function(x, n_curves, alpha, show_original, show_median, group_colors, ...) {
   
   # Create list to store plots
   plot_list <- list()
@@ -2275,7 +2320,14 @@ plot_survival_curves_separate <- function(x, n_curves, alpha, show_original, gro
     actual_curves <- min(n_curves, length(group_result$imputed_datasets))
     
     # Use the original single-group plotting function for each group
-    plot_list[[group_name]] <- plot_survival_curves(group_result, n_curves, alpha, show_original = show_original, ...) +
+    plot_list[[group_name]] <- plot_survival_curves(
+      group_result,
+      n_curves = n_curves,
+      alpha = alpha,
+      show_original = show_original,
+      show_median = show_median,
+      ...
+    ) +
       ggplot2::labs(
         title = paste("Group:", group_name),
         subtitle = paste("Solid black = Original KM | Faint red =", actual_curves, "imputed datasets")
@@ -2370,12 +2422,13 @@ plot_posterior_censored_groups <- function(x, dataset_id = NULL, ...) {
 #'   or unnamed vector in group order.
 #' @param group_colors Optional colors for groups (named or in group order)
 #' @param n_curves Number of imputed datasets to include (NULL for all)
-#' @param alpha Transparency for CI ribbon in each panel
+#' @param alpha Line transparency for overlaid group densities
 #' @param combine_groups For group density plots: whether to overlay groups on one plot (`TRUE`)
 #'   or show separate group panels (`FALSE`).
 #' @param ... Additional arguments passed to plot_density_comparison
 #' @keywords internal
-plot_density_comparison_groups <- function(x, dataset_id = NULL, group_colors = NULL, n_curves = NULL, alpha = 0.3,
+plot_density_comparison_groups <- function(x, dataset_id = NULL, group_colors = NULL, n_curves = NULL, alpha = 0.9,
+                                           density_scale = c("auto", "time", "log"),
                                            combine_groups = TRUE, ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package required for plotting")
@@ -2385,6 +2438,7 @@ plot_density_comparison_groups <- function(x, dataset_id = NULL, group_colors = 
   }
 
   n_by_group <- vapply(x$group_results, function(g) length(g$imputed_datasets), integer(1))
+  density_scale <- match.arg(density_scale)
   group_color_map <- resolve_group_colors(x$group_names, group_colors)
   ids_by_group <- resolve_comparison_dataset_ids(
     dataset_id = dataset_id,
@@ -2403,6 +2457,7 @@ plot_density_comparison_groups <- function(x, dataset_id = NULL, group_colors = 
         n_curves = n_curves,
         alpha = alpha,
         color = group_color_map[[group_name]],
+        density_scale = density_scale,
         ...
       )
       d <- p$data
@@ -2413,16 +2468,13 @@ plot_density_comparison_groups <- function(x, dataset_id = NULL, group_colors = 
       plot_data <- rbind(plot_data, d[, c("x", "y", "group")])
     }
 
-    subtitle_map <- paste0(names(ids_by_group), "=", as.integer(ids_by_group), collapse = ", ")
-    time_unit <- x$group_results[[1]]$model_info$time_unit %||% "days"
-
     p_combined <- ggplot2::ggplot(plot_data, ggplot2::aes(x = x, y = y, color = group)) +
       ggplot2::geom_line(linewidth = 1, alpha = alpha) +
       ggplot2::scale_color_manual(values = group_color_map) +
       ggplot2::labs(
         title = "Density Comparison by Group",
-        subtitle = paste0("Selected datasets: ", subtitle_map),
-        x = paste0("Time (", time_unit, ")"),
+        subtitle = selected_dataset_label(ids_by_group),
+        x = time_axis_label(x),
         y = "Density",
         color = NULL
       )
@@ -2443,6 +2495,7 @@ plot_density_comparison_groups <- function(x, dataset_id = NULL, group_colors = 
       n_curves = n_curves,
       alpha = alpha,
       color = group_color_map[[group_name]],
+      density_scale = density_scale,
       ...
     )
     p <- p + ggplot2::labs(

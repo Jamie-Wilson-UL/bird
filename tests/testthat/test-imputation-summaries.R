@@ -25,6 +25,32 @@ test_that("generate_complete_datasets produces monotone imputations", {
   }
 })
 
+test_that("generate_complete_datasets_np standardizes no-censoring datasets", {
+  data <- data.frame(
+    time = c(5, 8, 12),
+    status = c(1, 1, 1)
+  )
+
+  completed <- generate_complete_datasets_np(
+    data,
+    time_col = "time",
+    status_col = "status",
+    posterior_imputations = matrix(numeric(0), nrow = 4, ncol = 0),
+    censored_indices = integer(0),
+    n_imputations = 2
+  )
+
+  expect_equal(length(completed), 2)
+  expect_true(all(c(
+    "dataset_id", "original_status", "status",
+    "was_censored", "time", "original_time"
+  ) %in% names(completed[[1]])))
+  expect_equal(completed[[1]]$dataset_id, rep(1L, nrow(data)))
+  expect_false(any(completed[[1]]$was_censored))
+  expect_equal(completed[[1]]$original_time, data$time)
+  expect_equal(completed[[1]]$original_status, data$status)
+})
+
 test_that("calculate_imputation_summary handles censored observations", {
   base_data <- data.frame(
     time = c(5, 7, 10, 12),
@@ -99,4 +125,3 @@ test_that("calculate_clinical_metrics returns coherent metrics", {
   expect_equal(metrics$time_points, c(6, 12))
   # interpretation field was removed in recent updates
 })
-

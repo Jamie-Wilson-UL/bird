@@ -4,7 +4,13 @@
 \alias{plot_density_comparison_models}
 \title{Plot density comparison across models}
 \usage{
-plot_density_comparison_models(x, dataset_id = NULL, model_colors = NULL, ...)
+plot_density_comparison_models(
+  x,
+  dataset_id = NULL,
+  model_colors = NULL,
+  alpha = 0.9,
+  ...
+)
 }
 \arguments{
 \item{x}{bird_model_comparison object}
@@ -15,6 +21,8 @@ using a named vector (e.g. \code{c(weibull = 3, nonparametric = 5)})
 or unnamed vector in model order.}
 
 \item{model_colors}{Optional named/un-named vector of colors for models}
+
+\item{alpha}{Line transparency for overlaid model densities}
 
 \item{...}{Additional arguments (unused)}
 }

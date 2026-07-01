@@ -1,18 +1,16 @@
 #' Non-parametric DP Survival (Wrapper)
 #'
-#' Wrapper that exposes the vendored `LDDPsurvival()` function. 
-#' All arguments, return value and behaviour are identical to the original function 
-#' from **DPpackage**; we only forward the call.
+#' Internal wrapper for the vendored `LDDPsurvival()` function.
+#' All arguments, return value and behaviour are identical to the original
+#' function from **DPpackage**; we only forward the call.
 #'
 #' @param ... All arguments passed straight to `LDDPsurvival()`.
 #'
 #' @return The object returned by the internal `LDDPsurvival()` call (class
 #'   `LDDPsurvival`).
 #'
-#' @seealso Internally calls [LDDPsurvival.default()].  A higher-level helper
-#'   [bayes_np_impute()] provides user-friendly data
-#'   handling.
-#' @export
+#' @seealso Internally calls [LDDPsurvival.default()]. A higher-level helper
+#'   [bayes_np_impute()] provides user-friendly data handling.
 #' @keywords internal
 #' @examples
 #' # Not run: see bayes_np_impute() for a full example.
